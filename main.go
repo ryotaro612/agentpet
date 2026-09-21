@@ -14,7 +14,6 @@ func main() {
 		log.Fatal(err)
 	}
 	logger := internal.NewLogger(args.LogLevel())
-	logger.Debug("verbose logging enabled")
 
 	if args.ConfigFile != "" {
 		logger.Debug("loading config", "path", args.ConfigFile)
