@@ -2,6 +2,8 @@ package internal
 
 import (
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestLoadConfig(t *testing.T) {
@@ -77,42 +79,10 @@ func TestLoadConfig(t *testing.T) {
 				t.Fatalf("LoadConfig() error = %v, wantErr %v", err, c.wantErr)
 			}
 			if !c.wantErr {
-				compareConfigs(t, got, c.want)
+				if diff := cmp.Diff(c.want, got); diff != "" {
+					t.Errorf("LoadConfig() mismatch (-want +got):\n%s", diff)
+				}
 			}
 		})
-	}
-}
-
-func compareConfigs(t *testing.T, got, want Config) {
-	t.Helper()
-	if got.Server != want.Server {
-		t.Errorf("Server: got %+v, want %+v", got.Server, want.Server)
-	}
-	for name, wantPet := range want.Pet {
-		gotPet, ok := got.Pet[name]
-		if !ok {
-			t.Errorf("pet %q not found in result", name)
-			continue
-		}
-		if gotPet.Height != wantPet.Height || gotPet.Width != wantPet.Width || gotPet.FPS != wantPet.FPS {
-			t.Errorf("pet %q: got %+v, want %+v", name, gotPet, wantPet)
-		}
-		if gotPet.Window != wantPet.Window {
-			t.Errorf("pet %q window: got %+v, want %+v", name, gotPet.Window, wantPet.Window)
-		}
-		for animName, wantAnim := range wantPet.Animation {
-			gotAnim, ok := gotPet.Animation[animName]
-			if !ok {
-				t.Errorf("pet %q animation %q not found", name, animName)
-				continue
-			}
-			if gotAnim.File != wantAnim.File || gotAnim.FPS != wantAnim.FPS ||
-				gotAnim.Name != wantAnim.Name || gotAnim.Description != wantAnim.Description {
-				t.Errorf("pet %q animation %q: got %+v, want %+v", name, animName, gotAnim, wantAnim)
-			}
-			if gotAnim.Window != wantAnim.Window {
-				t.Errorf("pet %q animation %q window: got %+v, want %+v", name, animName, gotAnim.Window, wantAnim.Window)
-			}
-		}
 	}
 }
