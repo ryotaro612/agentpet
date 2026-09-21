@@ -1,5 +1,9 @@
 package internal
 
-func ParseCmd() {
-		"";
+func ParseArgs() (Args, error) {
+	panic("not implemented")
+
+}
+
+type Args struct {
 }
