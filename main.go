@@ -1,10 +1,28 @@
 package main
 
-import "github.com/webview/webview"
-import internal "github.com/ryotaro612/agentpet/internal"
+import (
+	"log"
+	"os"
+
+	internal "github.com/ryotaro612/agentpet/internal"
+	"github.com/webview/webview"
+)
 
 func main() {
-	internal.ParseCmd()
+	args, err := internal.ParseArgs()
+	if err != nil {
+		log.Fatal(err)
+	}
+	logger := internal.NewLogger(args.LogLevel())
+	logger.Debug("verbose logging enabled")
+
+	if args.ConfigFile != "" {
+		logger.Debug("loading config", "path", args.ConfigFile)
+		if _, err := internal.LoadConfig(args.ConfigFile); err != nil {
+			logger.Error("failed to load config", "err", err)
+			os.Exit(1)
+		}
+	}
 	w := webview.New(true)
 	defer w.Destroy()
 	w.SetTitle("Pet MCP")

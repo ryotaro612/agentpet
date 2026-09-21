@@ -1,2 +1,4 @@
+github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk=
+github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/webview/webview v0.0.0-20230830165049-e0ca3ed53345 h1:Yd7JTBOgDe3RoYuQTsSgLw0K8SN8VBZrYY9AxnoGMpM=
 github.com/webview/webview v0.0.0-20230830165049-e0ca3ed53345/go.mod h1:rpXAuuHgyEJb6kXcXldlkOjU6y4x+YcASKKXJNUhh0Y=
