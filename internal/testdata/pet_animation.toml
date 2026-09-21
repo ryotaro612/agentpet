@@ -1,0 +1,5 @@
+[pet.cat.animation.idle]
+file        = "idle.png"
+fps         = 6
+name        = "idle"
+description = "The cat sits still"

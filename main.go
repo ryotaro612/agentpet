@@ -16,7 +16,6 @@ func main() {
 	logger := internal.NewLogger(args.LogLevel())
 
 	if args.ConfigFile != "" {
-		logger.Debug("loading config", "path", args.ConfigFile)
 		if _, err := internal.LoadConfig(args.ConfigFile); err != nil {
 			logger.Error("failed to load config", "err", err)
 			os.Exit(1)

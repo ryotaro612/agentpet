@@ -1,0 +1,7 @@
+[pet.cat.window]
+height = 320
+width  = 480
+
+[pet.cat.animation.walk.window]
+height = 160
+width  = 240
