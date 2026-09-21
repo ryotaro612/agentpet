@@ -2,15 +2,15 @@ package internal
 
 import "github.com/BurntSushi/toml"
 
-type Config struct {
-	Server ServerConfig         `toml:"server"`
-	Pet    map[string]PetConfig `toml:"pet"`
-}
-
 func LoadConfig(path string) (Config, error) {
 	var cfg Config
 	_, err := toml.DecodeFile(path, &cfg)
 	return cfg, err
+}
+
+type Config struct {
+	Server ServerConfig         `toml:"server"`
+	Pet    map[string]PetConfig `toml:"pet"`
 }
 
 type ServerConfig struct {
