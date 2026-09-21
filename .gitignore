@@ -1,6 +1,0 @@
-.python-version
-__pycache__
-.vscode
-venv
-*.json
-**/node_modules
