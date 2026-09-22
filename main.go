@@ -29,15 +29,13 @@ func main() {
 	go func() {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
-		<-ch
-		cancel()
+		select {
+		case <-ch:
+			cancel()
+		case <-ctx.Done():
+		}
 	}()
 
-	view := internal.NeedView()
-	keeper := internal.NewKeeper()
-
-	if err := internal.RunServer(ctx, logger, cfg, cancel); err != nil {
-		logger.Error("server error", "err", err)
-		os.Exit(1)
-	}
+	s := internal.NewServer(internal.NewKeeper(), internal.NeedView(), cfg.Server.Port, args.ConfigFile, logger)
+	s.Run(ctx, cancel)
 }
