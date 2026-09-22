@@ -32,17 +32,20 @@ func NewServer(k *keeper, view view, port int, logger *slog.Logger, cancel conte
 		logger:    logger,
 		cancel:    cancel,
 	}
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "terminate",
-		Description: "Terminate the agentpet MCP server",
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-		defer cancel()
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: "Server is shutting down"}},
-		}, nil, nil
-	})
+	addTerminate := func() {
+		mcp.AddTool(s.mcpServer, &mcp.Tool{
+			Name:        "terminate",
+			Description: "Terminate the agentpet MCP server",
+		}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+			defer cancel()
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{&mcp.TextContent{Text: "Server is shutting down"}},
+			}, nil, nil
+		})
+	}
+	addTerminate()
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server { return s.mcpServer }, nil)
-	s.handler = configReloadMiddleware(k, logger, mcpHandler)
+	s.handler = configReloadMiddleware(k, addTerminate, logger, mcpHandler)
 	return s
 }
 
@@ -83,10 +86,13 @@ func (s server) Run(ctx context.Context) {
 	}
 }
 
-func configReloadMiddleware(k *keeper, logger *slog.Logger, next http.Handler) http.Handler {
+func configReloadMiddleware(k *keeper, notify func(), logger *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := k.reloadIfUpdated(); err != nil {
+		changed, err := k.reloadIfUpdated()
+		if err != nil {
 			logger.Warn("config reload failed", "err", err)
+		} else if changed {
+			notify()
 		}
 		next.ServeHTTP(w, r)
 	})

@@ -25,18 +25,18 @@ func NewKeeper(configFilePath string) (*keeper, error) {
 	return k, nil
 }
 
-func (k *keeper) reloadIfUpdated() error {
+func (k *keeper) reloadIfUpdated() (bool, error) {
 	info, err := os.Stat(k.configFilePath)
 	if err != nil {
-		return err
+		return false, err
 	}
 	k.mu.RLock()
 	lastMod := k.lastModTime
 	k.mu.RUnlock()
 	if !info.ModTime().After(lastMod) {
-		return nil
+		return false, nil
 	}
-	return k.loadConfig()
+	return true, k.loadConfig()
 }
 
 func (k *keeper) loadConfig() error {
