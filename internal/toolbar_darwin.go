@@ -5,31 +5,14 @@ package internal
 // #import <Cocoa/Cocoa.h>
 // #import <WebKit/WebKit.h>
 //
-// void hideToolbar(void* ptr) {
+// void setupWindow(void* ptr) {
 //     NSWindow* w = (__bridge NSWindow*)ptr;
-//     w.styleMask |= NSWindowStyleMaskFullSizeContentView;
-//     w.titlebarAppearsTransparent = YES;
-//     w.titleVisibility = NSWindowTitleHidden;
-//     [w standardWindowButton:NSWindowCloseButton].hidden = YES;
-//     [w standardWindowButton:NSWindowMiniaturizeButton].hidden = YES;
-//     [w standardWindowButton:NSWindowZoomButton].hidden = YES;
-// }
-//
-// static WKWebView* findWebView(NSView* view) {
-//     if ([view isKindOfClass:[WKWebView class]]) return (WKWebView*)view;
-//     for (NSView* sub in view.subviews) {
-//         WKWebView* found = findWebView(sub);
-//         if (found) return found;
-//     }
-//     return nil;
-// }
-//
-// void makeTransparent(void* ptr) {
-//     NSWindow* w = (__bridge NSWindow*)ptr;
+//     w.styleMask = NSWindowStyleMaskBorderless | NSWindowStyleMaskResizable;
 //     w.opaque = NO;
-//     w.backgroundColor = NSColor.clearColor;
-//     WKWebView* webView = findWebView(w.contentView);
-//     if (webView) {
+//     w.backgroundColor = [NSColor clearColor];
+//     w.level = NSFloatingWindowLevel;
+//     if ([w.contentView isKindOfClass:[WKWebView class]]) {
+//         WKWebView* webView = (WKWebView*)w.contentView;
 //         [webView setValue:@NO forKey:@"drawsBackground"];
 //     }
 // }
@@ -44,12 +27,8 @@ package internal
 import "C"
 import "unsafe"
 
-func HideToolbar(window unsafe.Pointer) {
-	C.hideToolbar(window)
-}
-
-func MakeTransparent(window unsafe.Pointer) {
-	C.makeTransparent(window)
+func SetupWindow(window unsafe.Pointer) {
+	C.setupWindow(window)
 }
 
 func MoveWindow(window unsafe.Pointer, dx, dy float64) {

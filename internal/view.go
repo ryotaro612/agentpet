@@ -3,28 +3,49 @@ package internal
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/http"
+	"sync"
 
 	"github.com/webview/webview"
 )
 
 type view struct {
-	w      webview.WebView
-	animCh chan animation
+	w        webview.WebView
+	animCh   chan animation
+	filePort int
+	readyCh  chan struct{}
 }
 
 func NewView() *view {
-	w := webview.New(true)
-	v := &view{
-		w:      w,
-		animCh: make(chan animation, 1),
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		panic(err)
 	}
+	go http.Serve(ln, http.FileServer(http.Dir("/")))
+
+	readyCh := make(chan struct{})
+	w := webview.New(false)
+	v := &view{
+		w:        w,
+		animCh:   make(chan animation, 1),
+		filePort: ln.Addr().(*net.TCPAddr).Port,
+		readyCh:  readyCh,
+	}
+
 	win := w.Window()
+	SetupWindow(win)
+
 	w.Bind("moveWindow", func(dx, dy float64) {
 		MoveWindow(win, dx, dy)
 	})
+
+	var once sync.Once
+	w.Bind("_viewReady", func() {
+		once.Do(func() { close(readyCh) })
+	})
+
 	w.SetHtml(viewHTML)
-	HideToolbar(win)
-	MakeTransparent(win)
 	return v
 }
 
@@ -46,6 +67,11 @@ func (v *view) Run(ctx context.Context) {
 }
 
 func (v *view) dispatch(ctx context.Context) {
+	select {
+	case <-v.readyCh:
+	case <-ctx.Done():
+		return
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -58,9 +84,11 @@ func (v *view) dispatch(ctx context.Context) {
 				}
 				if anim.width > 0 && windowHeight > 0 {
 					v.w.SetSize(anim.width, windowHeight, webview.HintNone)
+					SetupWindow(v.w.Window())
 				}
+				url := fmt.Sprintf("http://127.0.0.1:%d%s", v.filePort, anim.filePath)
 				v.w.Eval(fmt.Sprintf("showAnimation(%q, %d, %d, %d)",
-					anim.filePath, anim.fps, anim.width, anim.height))
+					url, anim.fps, anim.width, anim.height))
 			})
 		}
 	}
@@ -94,19 +122,24 @@ function showAnimation(src, fps, frameWidth, frameHeight) {
   var ctx = canvas.getContext('2d');
   var img = new Image();
   img.onload = function() {
-    var frameCount = Math.floor(img.width / frameWidth);
+    var cols = Math.floor(img.width / frameWidth);
+    var rows = Math.floor(img.height / frameHeight);
+    var frameCount = cols * rows;
     canvas.width = frameWidth;
     canvas.height = frameHeight;
     var frame = 0;
     if (animTimer) clearInterval(animTimer);
     animTimer = setInterval(function() {
+      var col = frame % cols;
+      var row = Math.floor(frame / cols);
       ctx.clearRect(0, 0, frameWidth, frameHeight);
-      ctx.drawImage(img, frame * frameWidth, 0, frameWidth, frameHeight,
+      ctx.drawImage(img, col * frameWidth, row * frameHeight,
+                    frameWidth, frameHeight,
                     0, 0, frameWidth, frameHeight);
       frame = (frame + 1) % frameCount;
     }, 1000 / fps);
   };
-  img.src = 'file://' + src;
+  img.src = src;
 }
 
 var dragging = false, lastX, lastY;
@@ -119,6 +152,8 @@ document.addEventListener('mousemove', function(e) {
   lastX = e.screenX; lastY = e.screenY;
 });
 document.addEventListener('mouseup', function() { dragging = false; });
+
+window._viewReady();
 </script>
 </body>
 </html>`
