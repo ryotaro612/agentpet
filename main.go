@@ -30,6 +30,8 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	s := internal.NewServer(keeper, internal.NewView(), cfg.Port(), logger, cancel)
-	s.Run(ctx)
+	v := internal.NewView()
+	s := internal.NewServer(keeper, v, cfg.Port(), logger, cancel)
+	go s.Run(ctx)
+	v.Run(ctx)
 }

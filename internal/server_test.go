@@ -20,7 +20,7 @@ func TestTerminateShutdownsServer(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(t.Context())
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	s := NewServer(k, NewView(), 0, logger, cancel)
+	s := NewServer(k, nil, 0, logger, cancel)
 
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	go s.mcpServer.Run(ctx, serverTransport)

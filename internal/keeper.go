@@ -25,6 +25,22 @@ func NewKeeper(configFilePath string) (*keeper, error) {
 	return k, nil
 }
 
+func (k *keeper) current() animation {
+	k.mu.RLock()
+	defer k.mu.RUnlock()
+	return k.currentAnimation
+}
+
+func (k *keeper) allAnimations() []animation {
+	k.mu.RLock()
+	defer k.mu.RUnlock()
+	var result []animation
+	for _, anims := range k.pets {
+		result = append(result, anims...)
+	}
+	return result
+}
+
 func (k *keeper) reloadIfUpdated() (bool, error) {
 	info, err := os.Stat(k.configFilePath)
 	if err != nil {

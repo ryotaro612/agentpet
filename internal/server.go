@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -15,7 +16,7 @@ import (
 
 type server struct {
 	keeper    *keeper
-	view      view
+	v         *view
 	portNum   int
 	mcpServer *mcp.Server
 	handler   http.Handler
@@ -23,16 +24,34 @@ type server struct {
 	cancel    context.CancelFunc
 }
 
-func NewServer(k *keeper, view view, port int, logger *slog.Logger, cancel context.CancelFunc) server {
+func NewServer(k *keeper, v *view, port int, logger *slog.Logger, cancel context.CancelFunc) server {
 	s := server{
 		keeper:    k,
-		view:      view,
+		v:         v,
 		portNum:   port,
 		mcpServer: mcp.NewServer(&mcp.Implementation{Name: "agentpet", Version: "v0.0.1"}, nil),
 		logger:    logger,
 		cancel:    cancel,
 	}
-	addTerminate := func() {
+	var (
+		animMu           sync.Mutex
+		currentAnimNames []string
+	)
+	registerTools := func() {
+		anims := k.allAnimations()
+
+		newNames := make([]string, 0, len(anims))
+		for _, anim := range anims {
+			newNames = append(newNames, anim.name)
+		}
+
+		animMu.Lock()
+		old := currentAnimNames
+		currentAnimNames = newNames
+		animMu.Unlock()
+
+		s.mcpServer.RemoveTools(old...)
+
 		mcp.AddTool(s.mcpServer, &mcp.Tool{
 			Name:        "terminate",
 			Description: "Terminate the agentpet MCP server",
@@ -42,15 +61,29 @@ func NewServer(k *keeper, view view, port int, logger *slog.Logger, cancel conte
 				Content: []mcp.Content{&mcp.TextContent{Text: "Server is shutting down"}},
 			}, nil, nil
 		})
+		for _, anim := range anims {
+			mcp.AddTool(s.mcpServer, &mcp.Tool{
+				Name:        anim.name,
+				Description: anim.description,
+			}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+				v.Show(anim)
+				return &mcp.CallToolResult{
+					Content: []mcp.Content{&mcp.TextContent{Text: "Displaying " + anim.name}},
+				}, nil, nil
+			})
+		}
 	}
-	addTerminate()
+	registerTools()
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server { return s.mcpServer }, nil)
-	s.handler = configReloadMiddleware(k, addTerminate, logger, mcpHandler)
+	s.handler = configReloadMiddleware(k, registerTools, logger, mcpHandler)
 	return s
 }
 
 func (s server) Run(ctx context.Context) {
 	defer s.cancel()
+	if s.v != nil {
+		s.v.Show(s.keeper.current())
+	}
 
 	port, err := s.availablePort()
 	if err != nil {
