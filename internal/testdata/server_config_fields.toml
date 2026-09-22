@@ -1,0 +1,5 @@
+[server]
+port   = 8080
+pet    = "cat"
+height = 320
+width  = 480

@@ -16,7 +16,7 @@ func TestLoadConfig(t *testing.T) {
 	}{
 		{
 			name: "parses server configuration fields",
-			file: "testdata/server.toml",
+			file: "testdata/server_config_fields.toml",
 			want: Config{
 				Server: ServerConfig{Port: 8080, Pet: "cat", Height: 320, Width: 480},
 			},
