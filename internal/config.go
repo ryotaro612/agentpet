@@ -9,8 +9,8 @@ func LoadConfig(path string) (Config, error) {
 }
 
 type Config struct {
-	Server ServerConfig         `toml:"server"`
-	Pet    map[string]PetConfig `toml:"pet"`
+	Server ServerConfig `toml:"server"`
+	Pet    []PetConfig  `toml:"pet"`
 }
 
 type ServerConfig struct {
@@ -21,6 +21,7 @@ type ServerConfig struct {
 }
 
 type PetConfig struct {
+	Name      string                     `toml:"name"`
 	Height    int                        `toml:"height"`
 	Width     int                        `toml:"width"`
 	FPS       int                        `toml:"fps"`

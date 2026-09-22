@@ -17,7 +17,7 @@ func main() {
 	}
 	logger := internal.NewLogger(args.LogLevel())
 
-	cfg, err := internal.LoadConfig(args.ConfigFile)
+	keeper, err := internal.NewKeeper(args.ConfigFile)
 	if err != nil {
 		logger.Error("failed to load config", "err", err)
 		os.Exit(1)
@@ -36,6 +36,6 @@ func main() {
 		}
 	}()
 
-	s := internal.NewServer(internal.NewKeeper(), internal.NeedView(), cfg.Server.Port, args.ConfigFile, logger)
+	s := internal.NewServer(keeper, internal.NeedView(), keeper.Port(), args.ConfigFile, logger)
 	s.Run(ctx, cancel)
 }

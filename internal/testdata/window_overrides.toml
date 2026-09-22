@@ -1,7 +1,10 @@
-[pet.cat.window]
+[[pet]]
+name = "cat"
+
+[pet.window]
 height = 320
 width  = 480
 
-[pet.cat.animation.walk.window]
+[pet.animation.walk.window]
 height = 160
 width  = 240

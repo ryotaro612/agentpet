@@ -25,8 +25,8 @@ func TestLoadConfig(t *testing.T) {
 			name: "parses pet sprite dimensions and frame rate",
 			file: "testdata/pet_sprite.toml",
 			want: Config{
-				Pet: map[string]PetConfig{
-					"cat": {Height: 32, Width: 32, FPS: 8},
+				Pet: []PetConfig{
+					{Name: "cat", Height: 32, Width: 32, FPS: 8},
 				},
 			},
 		},
@@ -34,8 +34,9 @@ func TestLoadConfig(t *testing.T) {
 			name: "parses a pet animation with file path, name, and description",
 			file: "testdata/pet_animation.toml",
 			want: Config{
-				Pet: map[string]PetConfig{
-					"cat": {
+				Pet: []PetConfig{
+					{
+						Name: "cat",
 						Animation: map[string]AnimationConfig{
 							"idle": {
 								File:        "idle.png",
@@ -52,8 +53,9 @@ func TestLoadConfig(t *testing.T) {
 			name: "applies window size overrides for a pet and its animation",
 			file: "testdata/window_overrides.toml",
 			want: Config{
-				Pet: map[string]PetConfig{
-					"cat": {
+				Pet: []PetConfig{
+					{
+						Name:   "cat",
 						Window: WindowConfig{Height: 320, Width: 480},
 						Animation: map[string]AnimationConfig{
 							"walk": {

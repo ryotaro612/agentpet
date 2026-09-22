@@ -1,4 +1,7 @@
-[pet.cat.animation.idle]
+[[pet]]
+name = "cat"
+
+[pet.animation.idle]
 file        = "idle.png"
 fps         = 6
 name        = "idle"
