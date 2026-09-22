@@ -1,19 +1,18 @@
 package internal
 
+import "sync"
+
 type keeper struct {
+	mu               *sync.RWMutex
 	currentAnimation animation
 	configFilePath   string
 	pets             map[string][]animation
-	serverPort       int
-}
-
-func (k keeper) Port() int {
-	return k.serverPort
 }
 
 func NewKeeper(configFilePath string) (keeper, error) {
 	k := keeper{
 		configFilePath: configFilePath,
+		mu:             &sync.RWMutex{},
 	}
 	if err := k.loadConfig(); err != nil {
 		return keeper{}, err
@@ -51,11 +50,15 @@ func (k *keeper) loadConfig() error {
 		}
 		pets[pet.Name] = anims
 	}
-	k.pets = pets
-	k.serverPort = cfg.Server.Port
 
+	var current animation
 	if anims, ok := pets[cfg.Server.Pet]; ok && len(anims) > 0 {
-		k.currentAnimation = anims[0]
+		current = anims[0]
 	}
+
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.pets = pets
+	k.currentAnimation = current
 	return nil
 }

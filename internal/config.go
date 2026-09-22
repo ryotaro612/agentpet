@@ -8,6 +8,10 @@ func LoadConfig(path string) (Config, error) {
 	return cfg, err
 }
 
+func (c Config) Port() int {
+	return c.Server.Port
+}
+
 type Config struct {
 	Server ServerConfig `toml:"server"`
 	Pet    []PetConfig  `toml:"pet"`

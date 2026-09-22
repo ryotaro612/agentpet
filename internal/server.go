@@ -14,22 +14,20 @@ import (
 )
 
 type server struct {
-	keeper         keeper
-	view           view
-	portNum        int
-	mcpServer      *mcp.Server
-	configFilePath string
-	logger         *slog.Logger
+	keeper    keeper
+	view      view
+	portNum   int
+	mcpServer *mcp.Server
+	logger    *slog.Logger
 }
 
-func NewServer(keeper keeper, view view, port int, configFilePath string, logger *slog.Logger) server {
+func NewServer(keeper keeper, view view, port int, logger *slog.Logger) server {
 	return server{
-		keeper:         keeper,
-		view:           view,
-		portNum:        port,
-		mcpServer:      mcp.NewServer(&mcp.Implementation{Name: "agentpet", Version: "v0.0.1"}, nil),
-		configFilePath: configFilePath,
-		logger:         logger,
+		keeper:    keeper,
+		view:      view,
+		portNum:   port,
+		mcpServer: mcp.NewServer(&mcp.Implementation{Name: "agentpet", Version: "v0.0.1"}, nil),
+		logger:    logger,
 	}
 }
 
