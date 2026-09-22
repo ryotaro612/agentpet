@@ -7,6 +7,10 @@ import (
 type view struct {
 }
 
+func NeedView() view {
+	return view{}
+}
+
 func RunWindow() {
 	w := webview.New(true)
 	defer w.Destroy()

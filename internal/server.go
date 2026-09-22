@@ -9,6 +9,24 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+type server struct {
+	keeper         keeper
+	view           view
+	port           int
+	mcpServer      *mcp.Server
+	configFilePath string
+	logger         *slog.Logger
+}
+
+func NewServer(keeper keeper, view view, port int, configFilePath string) server {
+
+	panic("not implemented")
+}
+
+func (s server) Run() {
+	panic("not implemented")
+}
+
 func RunServer(ctx context.Context, logger *slog.Logger, cfg Config, cancel context.CancelFunc) error {
 	s := mcp.NewServer(&mcp.Implementation{
 		Name:    "agentpet",

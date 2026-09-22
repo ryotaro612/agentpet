@@ -33,6 +33,9 @@ func main() {
 		cancel()
 	}()
 
+	view := internal.NeedView()
+	keeper := internal.NewKeeper()
+
 	if err := internal.RunServer(ctx, logger, cfg, cancel); err != nil {
 		logger.Error("server error", "err", err)
 		os.Exit(1)
