@@ -4,8 +4,6 @@ import (
 	"context"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
 
 	internal "github.com/ryotaro612/agentpet/internal"
 )
@@ -32,16 +30,6 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go func() {
-		ch := make(chan os.Signal, 1)
-		signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
-		select {
-		case <-ch:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
-
-	s := internal.NewServer(keeper, internal.NeedView(), cfg.Port(), logger)
-	s.Run(ctx, cancel)
+	s := internal.NewServer(keeper, internal.NewView(), cfg.Port(), logger, cancel)
+	s.Run(ctx)
 }

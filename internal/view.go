@@ -7,7 +7,7 @@ import (
 type view struct {
 }
 
-func NeedView() view {
+func NewView() view {
 	return view{}
 }
 

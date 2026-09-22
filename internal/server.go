@@ -14,26 +14,24 @@ import (
 )
 
 type server struct {
-	keeper    keeper
+	keeper    *keeper
 	view      view
 	portNum   int
 	mcpServer *mcp.Server
+	handler   http.Handler
 	logger    *slog.Logger
+	cancel    context.CancelFunc
 }
 
-func NewServer(keeper keeper, view view, port int, logger *slog.Logger) server {
-	return server{
-		keeper:    keeper,
+func NewServer(k *keeper, view view, port int, logger *slog.Logger, cancel context.CancelFunc) server {
+	s := server{
+		keeper:    k,
 		view:      view,
 		portNum:   port,
 		mcpServer: mcp.NewServer(&mcp.Implementation{Name: "agentpet", Version: "v0.0.1"}, nil),
 		logger:    logger,
+		cancel:    cancel,
 	}
-}
-
-func (s server) Run(ctx context.Context, cancel context.CancelFunc) {
-	defer cancel()
-
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "terminate",
 		Description: "Terminate the agentpet MCP server",
@@ -43,6 +41,13 @@ func (s server) Run(ctx context.Context, cancel context.CancelFunc) {
 			Content: []mcp.Content{&mcp.TextContent{Text: "Server is shutting down"}},
 		}, nil, nil
 	})
+	mcpHandler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server { return s.mcpServer }, nil)
+	s.handler = configReloadMiddleware(k, logger, mcpHandler)
+	return s
+}
+
+func (s server) Run(ctx context.Context) {
+	defer s.cancel()
 
 	port, err := s.availablePort()
 	if err != nil {
@@ -56,15 +61,14 @@ func (s server) Run(ctx context.Context, cancel context.CancelFunc) {
 	}
 	s.logger.Info("MCP server listening", "addr", ln.Addr().String())
 
-	handler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server { return s.mcpServer }, nil)
-	httpSrv := &http.Server{Handler: handler}
+	httpSrv := &http.Server{Handler: s.handler}
 
 	go func() {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
 		select {
 		case <-ch:
-			cancel()
+			s.cancel()
 		case <-ctx.Done():
 		}
 	}()
@@ -79,6 +83,15 @@ func (s server) Run(ctx context.Context, cancel context.CancelFunc) {
 	}
 }
 
+func configReloadMiddleware(k *keeper, logger *slog.Logger, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := k.reloadIfUpdated(); err != nil {
+			logger.Warn("config reload failed", "err", err)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func (s server) availablePort() (int, error) {
 	if s.portNum != 0 {
 		return s.portNum, nil
@@ -89,45 +102,4 @@ func (s server) availablePort() (int, error) {
 	}
 	defer ln.Close()
 	return ln.Addr().(*net.TCPAddr).Port, nil
-}
-
-func RunServer(ctx context.Context, logger *slog.Logger, cfg Config, cancel context.CancelFunc) error {
-	s := mcp.NewServer(&mcp.Implementation{
-		Name:    "agentpet",
-		Version: "v0.0.1",
-	}, nil)
-
-	mcp.AddTool(s, &mcp.Tool{
-		Name:        "terminate",
-		Description: "Terminate the agentpet MCP server",
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-		defer cancel()
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{&mcp.TextContent{Text: "Server is shutting down"}},
-		}, nil, nil
-	})
-
-	handler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server { return s }, nil)
-
-	port := cfg.Server.Port
-	if port == 0 {
-		port = 8080
-	}
-	addr := fmt.Sprintf(":%d", port)
-
-	srv := &http.Server{
-		Addr:    addr,
-		Handler: handler,
-	}
-
-	go func() {
-		<-ctx.Done()
-		srv.Shutdown(context.Background())
-	}()
-
-	logger.Info("MCP server listening", "addr", addr)
-	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-		return err
-	}
-	return nil
 }

@@ -1,26 +1,51 @@
 package internal
 
-import "sync"
+import (
+	"os"
+	"sync"
+	"time"
+)
 
 type keeper struct {
 	mu               *sync.RWMutex
 	currentAnimation animation
 	configFilePath   string
+	lastModTime      time.Time
 	pets             map[string][]animation
 }
 
-func NewKeeper(configFilePath string) (keeper, error) {
-	k := keeper{
+func NewKeeper(configFilePath string) (*keeper, error) {
+	k := &keeper{
 		configFilePath: configFilePath,
 		mu:             &sync.RWMutex{},
 	}
 	if err := k.loadConfig(); err != nil {
-		return keeper{}, err
+		return nil, err
 	}
 	return k, nil
 }
 
+func (k *keeper) reloadIfUpdated() error {
+	info, err := os.Stat(k.configFilePath)
+	if err != nil {
+		return err
+	}
+	k.mu.RLock()
+	lastMod := k.lastModTime
+	k.mu.RUnlock()
+	if !info.ModTime().After(lastMod) {
+		return nil
+	}
+	return k.loadConfig()
+}
+
 func (k *keeper) loadConfig() error {
+	info, err := os.Stat(k.configFilePath)
+	if err != nil {
+		return err
+	}
+	modTime := info.ModTime()
+
 	cfg, err := LoadConfig(k.configFilePath)
 	if err != nil {
 		return err
@@ -60,5 +85,6 @@ func (k *keeper) loadConfig() error {
 	defer k.mu.Unlock()
 	k.pets = pets
 	k.currentAnimation = current
+	k.lastModTime = modTime
 	return nil
 }
