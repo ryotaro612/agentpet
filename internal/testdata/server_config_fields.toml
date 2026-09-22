@@ -1,5 +1,6 @@
-[server]
-port   = 8080
-pet    = "cat"
+port = 8080
+pet  = "cat"
+
+[window]
 height = 320
 width  = 480

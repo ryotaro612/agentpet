@@ -31,7 +31,7 @@ func main() {
 	defer cancel()
 
 	v := internal.NewView()
-	s := internal.NewServer(keeper, v, cfg.Port(), logger, cancel)
+	s := internal.NewServer(keeper, v, cfg.Port, logger, cancel)
 	go s.Run(ctx)
 	v.Run(ctx)
 }

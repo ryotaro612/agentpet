@@ -1,0 +1,6 @@
+[[pets]]
+name = "cat"
+
+[[pets.animations]]
+name     = "idle"
+filepath = "idle.png"

@@ -67,13 +67,21 @@ func (k *keeper) loadConfig() error {
 		return err
 	}
 
-	pets := make(map[string][]animation, len(cfg.Pet))
-	for _, pet := range cfg.Pet {
-		anims := make([]animation, 0, len(pet.Animation))
-		for _, a := range pet.Animation {
+	pets := make(map[string][]animation, len(cfg.Pets))
+	for _, pet := range cfg.Pets {
+		anims := make([]animation, 0, len(pet.Animations))
+		for _, a := range pet.Animations {
 			fps := a.FPS
 			if fps == 0 {
 				fps = pet.FPS
+			}
+			frameHeight := a.Frame.Height
+			if frameHeight == 0 {
+				frameHeight = pet.Frame.Height
+			}
+			frameWidth := a.Frame.Width
+			if frameWidth == 0 {
+				frameWidth = pet.Frame.Width
 			}
 			windowHeight := a.Window.Height
 			if windowHeight == 0 {
@@ -82,8 +90,8 @@ func (k *keeper) loadConfig() error {
 			anims = append(anims, animation{
 				filePath:     a.File,
 				fps:          fps,
-				height:       pet.Height,
-				width:        pet.Width,
+				height:       frameHeight,
+				width:        frameWidth,
 				name:         a.Name,
 				description:  a.Description,
 				windowHeight: windowHeight,
@@ -93,7 +101,7 @@ func (k *keeper) loadConfig() error {
 	}
 
 	var current animation
-	if anims, ok := pets[cfg.Server.Pet]; ok && len(anims) > 0 {
+	if anims, ok := pets[cfg.Pet]; ok && len(anims) > 0 {
 		current = anims[0]
 	}
 

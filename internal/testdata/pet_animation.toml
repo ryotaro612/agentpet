@@ -1,8 +1,8 @@
-[[pet]]
+[[pets]]
 name = "cat"
 
-[pet.animation.idle]
-file        = "idle.png"
-fps         = 6
+[[pets.animations]]
 name        = "idle"
 description = "The cat sits still"
+filepath    = "idle.png"
+fps         = 6
