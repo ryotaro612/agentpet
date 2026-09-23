@@ -119,13 +119,16 @@ func (s *server) registerTools() {
 		InputSchema: buildEnumSchema("name", "Name of the animation to play", animNames),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, input nameInput) (*mcp.CallToolResult, any, error) {
 		s.mu.Lock()
-		anim, err := s.k.playAnimation(input.Name)
+		newK, anim, err := s.k.playAnimation(input.Name)
+		if err == nil {
+			s.k = newK
+		}
 		s.mu.Unlock()
 		if err != nil {
 			return nil, nil, err
 		}
-		if s.v != nil && anim != nil {
-			s.v.Show(toViewAnim(*anim))
+		if s.v != nil {
+			s.v.Show(toViewAnim(anim))
 		}
 		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Playing " + input.Name}}}, nil, nil
 	})
@@ -137,15 +140,16 @@ func (s *server) registerTools() {
 			InputSchema: buildEnumSchema("name", "Name of the pet to switch to", otherPets),
 		}, func(_ context.Context, _ *mcp.CallToolRequest, input nameInput) (*mcp.CallToolResult, any, error) {
 			s.mu.Lock()
-			anim, err := s.k.changePet(input.Name)
+			newK, anim, err := s.k.changePet(input.Name)
 			if err != nil {
 				s.mu.Unlock()
 				return nil, nil, err
 			}
+			s.k = newK
 			s.registerTools()
 			s.mu.Unlock()
-			if s.v != nil && anim != nil {
-				s.v.Show(toViewAnim(*anim))
+			if s.v != nil {
+				s.v.Show(toViewAnim(anim))
 			}
 			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Switched to " + input.Name}}}, nil, nil
 		})
@@ -156,28 +160,13 @@ func (s *server) onConfigChange(cfg config.Config) {
 	s.mu.Lock()
 	s.k = newKeeper(cfg)
 	s.registerTools()
-	anim := s.k.currentAnimation()
+	anim, ok := s.k.currentAnimation()
 	s.mu.Unlock()
-	if s.v != nil && anim != nil {
-		s.v.Show(toViewAnim(*anim))
+	if s.v != nil && ok {
+		s.v.Show(toViewAnim(anim))
 	}
 }
 
-func (s *server) serveImage(w http.ResponseWriter, r *http.Request) {
-	s.mu.RLock()
-	anim := s.k.currentAnimation()
-	s.mu.RUnlock()
-	if anim == nil {
-		http.NotFound(w, r)
-		return
-	}
-	path, err := anim.absFilePath()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	http.ServeFile(w, r, path)
-}
 
 func (s *server) Run(ctx context.Context) {
 	defer s.cancel()
@@ -201,16 +190,15 @@ func (s *server) Run(ctx context.Context) {
 
 	if s.v != nil {
 		s.mu.RLock()
-		anim := s.k.currentAnimation()
+		anim, ok := s.k.currentAnimation()
 		s.mu.RUnlock()
-		if anim != nil {
-			s.v.Show(toViewAnim(*anim))
+		if ok {
+			s.v.Show(toViewAnim(anim))
 		}
 	}
 
 	mux := http.NewServeMux()
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server { return s.mcpServer }, nil)
-	mux.HandleFunc("/image", s.serveImage)
 	mux.Handle("/", mcpHandler)
 	httpSrv := &http.Server{Handler: mux}
 

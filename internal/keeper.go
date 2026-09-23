@@ -9,7 +9,8 @@ import (
 type keeper struct {
 	pets       map[string][]animation
 	currentPet string
-	current    *animation
+	current    animation
+	hasCurrent bool
 }
 
 func newKeeper(cfg config.Config) keeper {
@@ -23,51 +24,53 @@ func newKeeper(cfg config.Config) keeper {
 		}
 	}
 	if anims := k.pets[k.currentPet]; len(anims) > 0 {
-		a := anims[0]
-		k.current = &a
+		k.current = anims[0]
+		k.hasCurrent = true
 	}
 	return k
 }
 
-func (k *keeper) playAnimation(name string) (*animation, error) {
+func (k keeper) playAnimation(name string) (keeper, animation, error) {
 	anims, ok := k.pets[k.currentPet]
 	if !ok {
-		return nil, fmt.Errorf("current pet %q not found", k.currentPet)
+		return k, animation{}, fmt.Errorf("current pet %q not found", k.currentPet)
 	}
 	for _, a := range anims {
 		if a.name != name {
 			continue
 		}
 		if err := a.live(); err != nil {
-			return nil, fmt.Errorf("animation %q unavailable: %w", name, err)
+			return k, animation{}, fmt.Errorf("animation %q unavailable: %w", name, err)
 		}
-		k.current = &a
-		return k.current, nil
+		k.current = a
+		k.hasCurrent = true
+		return k, a, nil
 	}
-	return nil, fmt.Errorf("animation %q not found for pet %q", name, k.currentPet)
+	return k, animation{}, fmt.Errorf("animation %q not found for pet %q", name, k.currentPet)
 }
 
-func (k *keeper) changePet(name string) (*animation, error) {
+func (k keeper) changePet(name string) (keeper, animation, error) {
 	anims, ok := k.pets[name]
 	if !ok {
-		return nil, fmt.Errorf("pet %q not found", name)
+		return k, animation{}, fmt.Errorf("pet %q not found", name)
 	}
 	for _, a := range anims {
 		if a.live() != nil {
 			continue
 		}
 		k.currentPet = name
-		k.current = &a
-		return k.current, nil
+		k.current = a
+		k.hasCurrent = true
+		return k, a, nil
 	}
-	return nil, fmt.Errorf("pet %q has no available animations", name)
+	return k, animation{}, fmt.Errorf("pet %q has no available animations", name)
 }
 
-func (k *keeper) currentAnimation() *animation {
-	return k.current
+func (k keeper) currentAnimation() (animation, bool) {
+	return k.current, k.hasCurrent
 }
 
-func (k *keeper) animationNames() []string {
+func (k keeper) animationNames() []string {
 	anims := k.pets[k.currentPet]
 	names := make([]string, len(anims))
 	for i, a := range anims {
@@ -76,7 +79,7 @@ func (k *keeper) animationNames() []string {
 	return names
 }
 
-func (k *keeper) otherPetNames() []string {
+func (k keeper) otherPetNames() []string {
 	others := make([]string, 0, len(k.pets)-1)
 	for name := range k.pets {
 		if name != k.currentPet {
