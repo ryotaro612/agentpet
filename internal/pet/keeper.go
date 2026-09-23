@@ -66,13 +66,8 @@ func (k Keeper) CurrentAnimation() Animation {
 	return k.current
 }
 
-func (k Keeper) AnimationNames() []string {
-	anims := k.pets[k.currentPet]
-	names := make([]string, len(anims))
-	for i, a := range anims {
-		names[i] = a.Name
-	}
-	return names
+func (k Keeper) Animations() []Animation {
+	return k.pets[k.currentPet]
 }
 
 func (k Keeper) OtherPetNames() []string {

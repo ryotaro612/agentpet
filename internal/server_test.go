@@ -47,7 +47,7 @@ func TestToolList(t *testing.T) {
 	}
 	sort.Strings(got)
 
-	want := []string{"hide_window", "play_animation", "show_window"}
+	want := []string{"anim_idle", "anim_walk", "hide_window", "show_window"}
 
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("tool list mismatch (-want +got):\n%s", diff)

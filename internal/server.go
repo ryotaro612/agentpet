@@ -29,8 +29,9 @@ type server struct {
 	mcpServer *mcp.Server
 	logger    *slog.Logger
 	cancel    context.CancelFunc
-	mu        sync.RWMutex
-	k         pet.Keeper
+	mu             sync.RWMutex
+	k              pet.Keeper
+	animToolNames  []string
 }
 
 func NewServer(w *config.Watcher, v *view.View, port int, logger *slog.Logger, cancel context.CancelFunc) *server {
@@ -94,33 +95,40 @@ func buildEnumSchema(param, description string, values []string) json.RawMessage
 
 // registerTools must be called with s.mu held for writing.
 func (s *server) registerTools() {
-	animNames := s.k.AnimationNames()
-	otherPets := s.k.OtherPetNames()
+	s.mcpServer.RemoveTools(append(s.animToolNames, "change_pet")...)
 
-	s.mcpServer.RemoveTools("play_animation", "change_pet")
+	anims := s.k.Animations()
+	s.animToolNames = make([]string, 0, len(anims))
+	for _, a := range anims {
+		toolName := "anim_" + a.Name
+		desc := a.Description
+		if desc == "" {
+			desc = "Play the " + a.Name + " animation"
+		}
+		animName := a.Name
+		s.animToolNames = append(s.animToolNames, toolName)
+		mcp.AddTool(s.mcpServer, &mcp.Tool{
+			Name:        toolName,
+			Description: desc,
+		}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+			s.mu.Lock()
+			newK, err := s.k.PlayAnimation(animName)
+			if err == nil {
+				s.k = newK
+			}
+			anim := s.k.CurrentAnimation()
+			s.mu.Unlock()
+			if err != nil {
+				return nil, nil, err
+			}
+			if s.v != nil {
+				s.v.Show(anim)
+			}
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Playing " + animName}}}, nil, nil
+		})
+	}
 
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "play_animation",
-		Description: "Play the named animation for the active pet",
-		InputSchema: buildEnumSchema("name", "Name of the animation to play", animNames),
-	}, func(_ context.Context, _ *mcp.CallToolRequest, input nameInput) (*mcp.CallToolResult, any, error) {
-		s.mu.Lock()
-		newK, err := s.k.PlayAnimation(input.Name)
-		if err == nil {
-			s.k = newK
-		}
-		anim := s.k.CurrentAnimation()
-		s.mu.Unlock()
-		if err != nil {
-			return nil, nil, err
-		}
-		if s.v != nil {
-			s.v.Show(anim)
-		}
-		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Playing " + input.Name}}}, nil, nil
-	})
-
-	if len(otherPets) > 0 {
+	if otherPets := s.k.OtherPetNames(); len(otherPets) > 0 {
 		mcp.AddTool(s.mcpServer, &mcp.Tool{
 			Name:        "change_pet",
 			Description: "Switch the active pet",

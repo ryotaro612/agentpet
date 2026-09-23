@@ -17,7 +17,7 @@ type Animation struct {
 	fps         int
 	Frame       Dimension
 	Name        string
-	description string
+	Description string
 	window      Dimension
 }
 
@@ -132,7 +132,7 @@ func resolveAnimation(a config.AnimationConfig, p config.PetConfig, cfg config.C
 			Width:  coalesce(a.Frame.Width, p.Frame.Width, cfg.Frame.Width),
 		},
 		Name:        a.Name,
-		description: a.Description,
+		Description: a.Description,
 		window: Dimension{
 			Height: coalesce(a.Window.Height, p.Window.Height, cfg.Window.Height),
 			Width:  coalesce(a.Window.Width, p.Window.Width, cfg.Window.Width),
