@@ -28,8 +28,8 @@ type server struct {
 	mcpServer *mcp.Server
 	logger    *slog.Logger
 	cancel    context.CancelFunc
-	toolsMu   sync.Mutex
-	k         *keeper
+	mu        sync.RWMutex
+	k         keeper
 }
 
 func NewServer(w *config.Watcher, v *view.View, port int, logger *slog.Logger, cancel context.CancelFunc) *server {
@@ -106,10 +106,8 @@ func buildEnumSchema(param, description string, values []string) json.RawMessage
 	return json.RawMessage(b)
 }
 
+// registerTools must be called with s.mu held for writing.
 func (s *server) registerTools() {
-	s.toolsMu.Lock()
-	defer s.toolsMu.Unlock()
-
 	animNames := s.k.animationNames()
 	otherPets := s.k.otherPetNames()
 
@@ -120,7 +118,9 @@ func (s *server) registerTools() {
 		Description: "Play the named animation for the active pet",
 		InputSchema: buildEnumSchema("name", "Name of the animation to play", animNames),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, input nameInput) (*mcp.CallToolResult, any, error) {
+		s.mu.Lock()
 		anim, err := s.k.playAnimation(input.Name)
+		s.mu.Unlock()
 		if err != nil {
 			return nil, nil, err
 		}
@@ -136,11 +136,14 @@ func (s *server) registerTools() {
 			Description: "Switch the active pet",
 			InputSchema: buildEnumSchema("name", "Name of the pet to switch to", otherPets),
 		}, func(_ context.Context, _ *mcp.CallToolRequest, input nameInput) (*mcp.CallToolResult, any, error) {
+			s.mu.Lock()
 			anim, err := s.k.changePet(input.Name)
 			if err != nil {
+				s.mu.Unlock()
 				return nil, nil, err
 			}
 			s.registerTools()
+			s.mu.Unlock()
 			if s.v != nil && anim != nil {
 				s.v.Show(toViewAnim(*anim))
 			}
@@ -150,17 +153,20 @@ func (s *server) registerTools() {
 }
 
 func (s *server) onConfigChange(cfg config.Config) {
-	s.k.rebuildFrom(cfg)
+	s.mu.Lock()
+	s.k = newKeeper(cfg)
 	s.registerTools()
-	if s.v != nil {
-		if a := s.k.currentAnimation(); a != nil {
-			s.v.Show(toViewAnim(*a))
-		}
+	anim := s.k.currentAnimation()
+	s.mu.Unlock()
+	if s.v != nil && anim != nil {
+		s.v.Show(toViewAnim(*anim))
 	}
 }
 
 func (s *server) serveImage(w http.ResponseWriter, r *http.Request) {
+	s.mu.RLock()
 	anim := s.k.currentAnimation()
+	s.mu.RUnlock()
 	if anim == nil {
 		http.NotFound(w, r)
 		return
@@ -194,8 +200,11 @@ func (s *server) Run(ctx context.Context) {
 	s.logger.Info("MCP server listening", "addr", addr)
 
 	if s.v != nil {
-		if a := s.k.currentAnimation(); a != nil {
-			s.v.Show(toViewAnim(*a))
+		s.mu.RLock()
+		anim := s.k.currentAnimation()
+		s.mu.RUnlock()
+		if anim != nil {
+			s.v.Show(toViewAnim(*anim))
 		}
 	}
 
