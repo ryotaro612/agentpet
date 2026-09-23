@@ -14,6 +14,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ryotaro612/agentpet/internal/config"
+	"github.com/ryotaro612/agentpet/internal/pet"
 	"github.com/ryotaro612/agentpet/internal/view"
 )
 
@@ -29,7 +30,7 @@ type server struct {
 	logger    *slog.Logger
 	cancel    context.CancelFunc
 	mu        sync.RWMutex
-	k         keeper
+	k         pet.Keeper
 }
 
 func NewServer(w *config.Watcher, v *view.View, port int, logger *slog.Logger, cancel context.CancelFunc) *server {
@@ -44,7 +45,7 @@ func NewServer(w *config.Watcher, v *view.View, port int, logger *slog.Logger, c
 		}),
 		logger: logger,
 		cancel: cancel,
-		k:      newKeeper(w.Get()),
+		k:      pet.NewKeeper(w.Get()),
 	}
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -71,18 +72,18 @@ func NewServer(w *config.Watcher, v *view.View, port int, logger *slog.Logger, c
 	return s
 }
 
-func toViewAnim(a animation) view.Anim {
-	fps, fpsErr := a.calcFps()
-	dim := a.windowDim()
-	filePath, _ := a.absFilePath()
+func toViewAnim(a pet.Animation) view.Anim {
+	fps, fpsErr := a.CalcFps()
+	dim := a.WindowDim()
+	filePath, _ := a.AbsFilePath()
 	return view.Anim{
-		Name:     a.name,
+		Name:     a.Name,
 		FPS:      fps,
 		FPSErr:   fpsErr,
-		FrameW:   a.frame.width,
-		FrameH:   a.frame.height,
-		WinW:     dim.width,
-		WinH:     dim.height,
+		FrameW:   a.Frame.Width,
+		FrameH:   a.Frame.Height,
+		WinW:     dim.Width,
+		WinH:     dim.Height,
 		FilePath: filePath,
 	}
 }
@@ -108,8 +109,8 @@ func buildEnumSchema(param, description string, values []string) json.RawMessage
 
 // registerTools must be called with s.mu held for writing.
 func (s *server) registerTools() {
-	animNames := s.k.animationNames()
-	otherPets := s.k.otherPetNames()
+	animNames := s.k.AnimationNames()
+	otherPets := s.k.OtherPetNames()
 
 	s.mcpServer.RemoveTools("play_animation", "change_pet")
 
@@ -119,11 +120,11 @@ func (s *server) registerTools() {
 		InputSchema: buildEnumSchema("name", "Name of the animation to play", animNames),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, input nameInput) (*mcp.CallToolResult, any, error) {
 		s.mu.Lock()
-		newK, err := s.k.playAnimation(input.Name)
+		newK, err := s.k.PlayAnimation(input.Name)
 		if err == nil {
 			s.k = newK
 		}
-		anim := s.k.currentAnimation()
+		anim := s.k.CurrentAnimation()
 		s.mu.Unlock()
 		if err != nil {
 			return nil, nil, err
@@ -141,14 +142,14 @@ func (s *server) registerTools() {
 			InputSchema: buildEnumSchema("name", "Name of the pet to switch to", otherPets),
 		}, func(_ context.Context, _ *mcp.CallToolRequest, input nameInput) (*mcp.CallToolResult, any, error) {
 			s.mu.Lock()
-			newK, err := s.k.changePet(input.Name)
+			newK, err := s.k.ChangePet(input.Name)
 			if err != nil {
 				s.mu.Unlock()
 				return nil, nil, err
 			}
 			s.k = newK
 			s.registerTools()
-			anim := s.k.currentAnimation()
+			anim := s.k.CurrentAnimation()
 			s.mu.Unlock()
 			if s.v != nil {
 				s.v.Show(toViewAnim(anim))
@@ -160,9 +161,9 @@ func (s *server) registerTools() {
 
 func (s *server) onConfigChange(cfg config.Config) {
 	s.mu.Lock()
-	s.k = newKeeper(cfg)
+	s.k = pet.NewKeeper(cfg)
 	s.registerTools()
-	anim := s.k.currentAnimation()
+	anim := s.k.CurrentAnimation()
 	s.mu.Unlock()
 	if s.v != nil {
 		s.v.Show(toViewAnim(anim))
@@ -192,7 +193,7 @@ func (s *server) Run(ctx context.Context) {
 
 	if s.v != nil {
 		s.mu.RLock()
-		anim := s.k.currentAnimation()
+		anim := s.k.CurrentAnimation()
 		s.mu.RUnlock()
 		s.v.Show(toViewAnim(anim))
 	}
