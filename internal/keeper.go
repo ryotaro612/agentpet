@@ -1,114 +1,43 @@
 package internal
 
-import (
-	"os"
-	"sync"
-	"time"
-)
+import "github.com/ryotaro612/agentpet/internal/config"
 
-type keeper struct {
-	mu               *sync.RWMutex
-	currentAnimation animation
-	configFilePath   string
-	lastModTime      time.Time
-	pets             map[string][]animation
-}
-
-func NewKeeper(configFilePath string) (*keeper, error) {
-	k := &keeper{
-		configFilePath: configFilePath,
-		mu:             &sync.RWMutex{},
-	}
-	if err := k.loadConfig(); err != nil {
-		return nil, err
-	}
-	return k, nil
-}
-
-func (k *keeper) current() animation {
-	k.mu.RLock()
-	defer k.mu.RUnlock()
-	return k.currentAnimation
-}
-
-func (k *keeper) allAnimations() []animation {
-	k.mu.RLock()
-	defer k.mu.RUnlock()
+func animationsFromConfig(cfg config.Config) []animation {
 	var result []animation
-	for _, anims := range k.pets {
-		result = append(result, anims...)
+	for _, pet := range cfg.Pets {
+		for _, a := range pet.Animations {
+			result = append(result, resolveAnimation(a, pet, cfg))
+		}
 	}
 	return result
 }
 
-func (k *keeper) reloadIfUpdated() (bool, error) {
-	info, err := os.Stat(k.configFilePath)
-	if err != nil {
-		return false, err
+func resolveAnimation(a config.AnimationConfig, pet config.PetConfig, cfg config.Config) animation {
+	return animation{
+		filePath:     a.File,
+		fps:          coalesce(a.FPS, pet.FPS, cfg.FPS),
+		height:       coalesce(a.Frame.Height, pet.Frame.Height, cfg.Frame.Height),
+		width:        coalesce(a.Frame.Width, pet.Frame.Width, cfg.Frame.Width),
+		name:         a.Name,
+		description:  a.Description,
+		windowHeight: coalesce(a.Window.Height, pet.Window.Height, cfg.Window.Height),
 	}
-	k.mu.RLock()
-	lastMod := k.lastModTime
-	k.mu.RUnlock()
-	if !info.ModTime().After(lastMod) {
-		return false, nil
-	}
-	return true, k.loadConfig()
 }
 
-func (k *keeper) loadConfig() error {
-	info, err := os.Stat(k.configFilePath)
-	if err != nil {
-		return err
-	}
-	modTime := info.ModTime()
-
-	cfg, err := LoadConfig(k.configFilePath)
-	if err != nil {
-		return err
-	}
-
-	pets := make(map[string][]animation, len(cfg.Pets))
-	for _, pet := range cfg.Pets {
-		anims := make([]animation, 0, len(pet.Animations))
-		for _, a := range pet.Animations {
-			fps := a.FPS
-			if fps == 0 {
-				fps = pet.FPS
-			}
-			frameHeight := a.Frame.Height
-			if frameHeight == 0 {
-				frameHeight = pet.Frame.Height
-			}
-			frameWidth := a.Frame.Width
-			if frameWidth == 0 {
-				frameWidth = pet.Frame.Width
-			}
-			windowHeight := a.Window.Height
-			if windowHeight == 0 {
-				windowHeight = pet.Window.Height
-			}
-			anims = append(anims, animation{
-				filePath:     a.File,
-				fps:          fps,
-				height:       frameHeight,
-				width:        frameWidth,
-				name:         a.Name,
-				description:  a.Description,
-				windowHeight: windowHeight,
-			})
+func coalesce(vals ...int) int {
+	for _, v := range vals {
+		if v != 0 {
+			return v
 		}
-		pets[pet.Name] = anims
 	}
+	return 0
+}
 
-	var current animation
-	if anims, ok := pets[cfg.Pet]; ok && len(anims) > 0 {
-		current = anims[0]
+func initialAnimation(cfg config.Config) animation {
+	for _, pet := range cfg.Pets {
+		if pet.Name == cfg.Pet && len(pet.Animations) > 0 {
+			return resolveAnimation(pet.Animations[0], pet, cfg)
+		}
 	}
-
-	k.mu.Lock()
-	defer k.mu.Unlock()
-	k.pets = pets
-	k.currentAnimation = current
-	k.lastModTime = modTime
-	return nil
+	return animation{}
 }

@@ -1,4 +1,4 @@
-package internal
+package config
 
 import (
 	"testing"
@@ -19,7 +19,7 @@ func TestLoadConfig(t *testing.T) {
 			file: "testdata/server_config_fields.toml",
 			want: Config{
 				Port:   8080,
-				Window: ResolutionConfig{Height: 320, Width: 480},
+				Window: DimensionConfig{Height: 320, Width: 480},
 			},
 		},
 		{
@@ -30,7 +30,7 @@ func TestLoadConfig(t *testing.T) {
 					{
 						Name:  "cat",
 						FPS:   8,
-						Frame: ResolutionConfig{Height: 32, Width: 32},
+						Frame: DimensionConfig{Height: 32, Width: 32},
 						Animations: []AnimationConfig{
 							{Name: "idle", File: "idle.png"},
 						},
@@ -45,7 +45,7 @@ func TestLoadConfig(t *testing.T) {
 				Pets: []PetConfig{
 					{
 						Name:  "cat",
-						Frame: ResolutionConfig{Height: 32, Width: 32},
+						Frame: DimensionConfig{Height: 32, Width: 32},
 						Animations: []AnimationConfig{
 							{
 								Name:        "idle",
@@ -65,13 +65,13 @@ func TestLoadConfig(t *testing.T) {
 				Pets: []PetConfig{
 					{
 						Name:   "cat",
-						Frame:  ResolutionConfig{Height: 32, Width: 32},
-						Window: ResolutionConfig{Height: 320, Width: 480},
+						Frame:  DimensionConfig{Height: 32, Width: 32},
+						Window: DimensionConfig{Height: 320, Width: 480},
 						Animations: []AnimationConfig{
 							{
 								Name:   "walk",
 								File:   "walk.png",
-								Window: ResolutionConfig{Height: 160, Width: 240},
+								Window: DimensionConfig{Height: 160, Width: 240},
 							},
 						},
 					},
@@ -85,53 +85,63 @@ func TestLoadConfig(t *testing.T) {
 		},
 		{
 			name:    "returns an error if the port is outside the valid range",
-			file:    "testdata/config/invalid_port_negative.toml",
+			file:    "testdata/invalid_port_negative.toml",
 			wantErr: true,
 		},
 		{
 			name: "accepts a port within the valid range",
-			file: "testdata/config/valid_port.toml",
+			file: "testdata/valid_port.toml",
 		},
 		{
-			name:    "returns an error if frame is missing",
-			file:    "testdata/config/frame_missing.toml",
+			name:    "returns an error if animation frame is missing",
+			file:    "testdata/frame_missing.toml",
 			wantErr: true,
 		},
 		{
 			name:    "returns an error if frame defines only height",
-			file:    "testdata/config/frame_height_only.toml",
+			file:    "testdata/frame_height_only.toml",
 			wantErr: true,
 		},
 		{
 			name:    "returns an error if frame defines only width",
-			file:    "testdata/config/frame_width_only.toml",
+			file:    "testdata/frame_width_only.toml",
 			wantErr: true,
 		},
 		{
 			name: "accepts an animation that inherits frame from its pet",
-			file: "testdata/config/frame_inherited_from_pet.toml",
+			file: "testdata/frame_inherited_from_pet.toml",
 		},
 		{
 			name: "accepts an animation that inherits frame from the config",
-			file: "testdata/config/frame_inherited_from_config.toml",
+			file: "testdata/frame_inherited_from_config.toml",
 		},
 		{
 			name:    "returns an error if filepath is missing",
-			file:    "testdata/config/file_missing.toml",
+			file:    "testdata/file_missing.toml",
 			wantErr: true,
 		},
 		{
 			name:    "returns an error if Config.Pet is not in Config.Pets",
-			file:    "testdata/config/pet_not_found.toml",
+			file:    "testdata/pet_not_found.toml",
 			wantErr: true,
 		},
 		{
 			name: "accepts Config.Pet that matches a pet name",
-			file: "testdata/config/pet_found.toml",
+			file: "testdata/pet_found.toml",
 		},
 		{
 			name:    "returns an error if a pet has no animations",
-			file:    "testdata/config/animations_missing.toml",
+			file:    "testdata/animations_missing.toml",
+			wantErr: true,
+		},
+		{
+			name:    "returns an error on duplicate pet names",
+			file:    "testdata/duplicate_pet_names.toml",
+			wantErr: true,
+		},
+		{
+			name:    "returns an error on duplicate animation names within a pet",
+			file:    "testdata/duplicate_animation_names.toml",
 			wantErr: true,
 		},
 	}

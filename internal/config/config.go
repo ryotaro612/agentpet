@@ -1,4 +1,4 @@
-package internal
+package config
 
 import (
 	"errors"
@@ -26,14 +26,24 @@ func (c Config) validate() error {
 	if c.Frame.isPartial() {
 		errs = append(errs, fmt.Errorf("config frame: both height and width are required"))
 	}
+	petSeen := make(map[string]bool, len(c.Pets))
 	for _, pet := range c.Pets {
+		if petSeen[pet.Name] {
+			errs = append(errs, fmt.Errorf("duplicate pet name %q", pet.Name))
+		}
+		petSeen[pet.Name] = true
 		if pet.Frame.isPartial() {
 			errs = append(errs, fmt.Errorf("pet %q frame: both height and width are required", pet.Name))
 		}
 		if len(pet.Animations) == 0 {
 			errs = append(errs, fmt.Errorf("pet %q has no animations", pet.Name))
 		}
+		animSeen := make(map[string]bool, len(pet.Animations))
 		for _, anim := range pet.Animations {
+			if animSeen[anim.Name] {
+				errs = append(errs, fmt.Errorf("pet %q has duplicate animation name %q", pet.Name, anim.Name))
+			}
+			animSeen[anim.Name] = true
 			if anim.Frame.isPartial() {
 				errs = append(errs, fmt.Errorf("animation %q frame: both height and width are required", anim.Name))
 			}
@@ -60,42 +70,42 @@ func (c Config) validate() error {
 	return errors.Join(errs...)
 }
 
-func (r ResolutionConfig) isPartial() bool {
-	return (r.Height == 0) != (r.Width == 0)
+func (d DimensionConfig) isPartial() bool {
+	return (d.Height == 0) != (d.Width == 0)
 }
 
-func (r ResolutionConfig) isComplete() bool {
-	return r.Height > 0 && r.Width > 0
+func (d DimensionConfig) isComplete() bool {
+	return d.Height > 0 && d.Width > 0
 }
 
 type Config struct {
-	Port   int              `toml:"port"`
-	Pet    string           `toml:"pet"`
-	Window ResolutionConfig `toml:"window"`
-	Frame  ResolutionConfig `toml:"frame"`
-	FPS    int              `toml:"fps"`
-	Pets   []PetConfig      `toml:"pets"`
+	Port   int             `toml:"port"`
+	Pet    string          `toml:"pet"`
+	Window DimensionConfig `toml:"window"`
+	Frame  DimensionConfig `toml:"frame"`
+	FPS    int             `toml:"fps"`
+	Pets   []PetConfig     `toml:"pets"`
 }
 
 type PetConfig struct {
 	Name        string            `toml:"name"`
 	Description string            `toml:"description"`
-	Frame       ResolutionConfig  `toml:"frame"`
-	Window      ResolutionConfig  `toml:"window"`
+	Frame       DimensionConfig   `toml:"frame"`
+	Window      DimensionConfig   `toml:"window"`
 	FPS         int               `toml:"fps"`
 	Animations  []AnimationConfig `toml:"animations"`
 }
 
 type AnimationConfig struct {
-	Name        string           `toml:"name"`
-	Description string           `toml:"description"`
-	File        string           `toml:"filepath"`
-	Frame       ResolutionConfig `toml:"frame"`
-	Window      ResolutionConfig `toml:"window"`
-	FPS         int              `toml:"fps"`
+	Name        string          `toml:"name"`
+	Description string          `toml:"description"`
+	File        string          `toml:"filepath"`
+	Frame       DimensionConfig `toml:"frame"`
+	Window      DimensionConfig `toml:"window"`
+	FPS         int             `toml:"fps"`
 }
 
-type ResolutionConfig struct {
+type DimensionConfig struct {
 	Height int `toml:"height"`
 	Width  int `toml:"width"`
 }

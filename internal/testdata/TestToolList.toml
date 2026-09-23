@@ -1,0 +1,18 @@
+pet = "cat"
+
+[[pets]]
+name = "cat"
+
+[pets.frame]
+height = 32
+width  = 32
+
+[[pets.animations]]
+name        = "idle"
+description = "The cat is idle"
+filepath    = "idle.png"
+
+[[pets.animations]]
+name        = "walk"
+description = "The cat walks"
+filepath    = "walk.png"

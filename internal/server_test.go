@@ -4,23 +4,28 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"sort"
 	"testing"
-	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/ryotaro612/agentpet/internal/config"
 )
 
-func TestTerminateShutdownsServer(t *testing.T) {
+func TestToolList(t *testing.T) {
 	t.Parallel()
 
-	k, err := NewKeeper("testdata/TestTerminateShutdownsServer.toml")
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	cfg, err := config.LoadConfig("testdata/TestToolList.toml")
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	ctx, cancel := context.WithCancel(t.Context())
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	s := NewServer(k, nil, 0, logger, cancel)
+	watcher := config.NewConfigWatcher(ctx, "testdata/TestToolList.toml", cfg, logger)
+
+	s := NewServer(watcher, nil, 0, logger, cancel)
 
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	go s.mcpServer.Run(ctx, serverTransport)
@@ -31,11 +36,20 @@ func TestTerminateShutdownsServer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cs.CallTool(t.Context(), &mcp.CallToolParams{Name: "terminate"})
+	result, err := cs.ListTools(t.Context(), &mcp.ListToolsParams{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	select {
-	case <-ctx.Done():
-	case <-time.After(2 * time.Second):
-		t.Fatal("context was not cancelled after calling terminate")
+	got := make([]string, len(result.Tools))
+	for i, tool := range result.Tools {
+		got[i] = tool.Name
+	}
+	sort.Strings(got)
+
+	want := []string{"hide_window", "idle", "show_window", "walk"}
+
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("tool list mismatch (-want +got):\n%s", diff)
 	}
 }

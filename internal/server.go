@@ -12,77 +12,111 @@ import (
 	"syscall"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/ryotaro612/agentpet/internal/config"
 )
 
 type server struct {
-	keeper    *keeper
+	watcher   *config.Watcher
 	v         *view
 	portNum   int
 	mcpServer *mcp.Server
-	handler   http.Handler
 	logger    *slog.Logger
 	cancel    context.CancelFunc
+	animMu    sync.Mutex
+	animNames []string
 }
 
-func NewServer(k *keeper, v *view, port int, logger *slog.Logger, cancel context.CancelFunc) server {
-	s := server{
-		keeper:    k,
-		v:         v,
-		portNum:   port,
-		mcpServer: mcp.NewServer(&mcp.Implementation{Name: "agentpet", Version: "v0.0.1"}, nil),
-		logger:    logger,
-		cancel:    cancel,
+func NewServer(w *config.Watcher, v *view, port int, logger *slog.Logger, cancel context.CancelFunc) *server {
+	s := &server{
+		watcher: w,
+		v:       v,
+		portNum: port,
+		mcpServer: mcp.NewServer(&mcp.Implementation{Name: "agentpet", Version: "v0.0.1"}, &mcp.ServerOptions{
+			Capabilities: &mcp.ServerCapabilities{
+				Tools: &mcp.ToolCapabilities{ListChanged: true},
+			},
+		}),
+		logger: logger,
+		cancel: cancel,
 	}
-	var (
-		animMu           sync.Mutex
-		currentAnimNames []string
-	)
-	registerTools := func() {
-		anims := k.allAnimations()
-
-		newNames := make([]string, 0, len(anims))
-		for _, anim := range anims {
-			newNames = append(newNames, anim.name)
-		}
-
-		animMu.Lock()
-		old := currentAnimNames
-		currentAnimNames = newNames
-		animMu.Unlock()
-
-		s.mcpServer.RemoveTools(old...)
-
-		mcp.AddTool(s.mcpServer, &mcp.Tool{
-			Name:        "terminate",
-			Description: "Terminate the agentpet MCP server",
-		}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-			defer cancel()
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{&mcp.TextContent{Text: "Server is shutting down"}},
-			}, nil, nil
-		})
-		for _, anim := range anims {
-			mcp.AddTool(s.mcpServer, &mcp.Tool{
-				Name:        anim.name,
-				Description: anim.description,
-			}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-				v.Show(anim)
-				return &mcp.CallToolResult{
-					Content: []mcp.Content{&mcp.TextContent{Text: "Displaying " + anim.name}},
-				}, nil, nil
-			})
-		}
-	}
-	registerTools()
-	mcpHandler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server { return s.mcpServer }, nil)
-	s.handler = configReloadMiddleware(k, registerTools, logger, mcpHandler)
+	s.registerTools(w.Get())
 	return s
 }
 
-func (s server) Run(ctx context.Context) {
+func toolHandlerFor(getConfig func() config.Config) func(fn func(config.Config) (*mcp.CallToolResult, any, error)) func(context.Context, *mcp.CallToolRequest, struct{}) (*mcp.CallToolResult, any, error) {
+	return func(fn func(config.Config) (*mcp.CallToolResult, any, error)) func(context.Context, *mcp.CallToolRequest, struct{}) (*mcp.CallToolResult, any, error) {
+		return func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+			return fn(getConfig())
+		}
+	}
+}
+
+func (s *server) registerTools(cfg config.Config) {
+	anims := animationsFromConfig(cfg)
+
+	newNames := make([]string, 0, len(anims))
+	for _, a := range anims {
+		newNames = append(newNames, a.name)
+	}
+
+	s.animMu.Lock()
+	old := s.animNames
+	s.animNames = newNames
+	s.animMu.Unlock()
+
+	s.mcpServer.RemoveTools(old...)
+
+	withConfig := toolHandlerFor(s.watcher.Get)
+
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "show_window",
+		Description: "Show the pet window",
+	}, withConfig(func(_ config.Config) (*mcp.CallToolResult, any, error) {
+		if s.v != nil {
+			s.v.ShowWindow()
+		}
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Window is now visible"}}}, nil, nil
+	}))
+
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "hide_window",
+		Description: "Hide the pet window",
+	}, withConfig(func(_ config.Config) (*mcp.CallToolResult, any, error) {
+		if s.v != nil {
+			s.v.HideWindow()
+		}
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Window is now hidden"}}}, nil, nil
+	}))
+
+	for _, anim := range anims {
+		animName := anim.name
+		mcp.AddTool(s.mcpServer, &mcp.Tool{
+			Name:        animName,
+			Description: anim.description,
+		}, withConfig(func(cfg config.Config) (*mcp.CallToolResult, any, error) {
+			if s.v == nil {
+				return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Displaying " + animName}}}, nil, nil
+			}
+			for _, a := range animationsFromConfig(cfg) {
+				if a.name == animName {
+					s.v.Show(a)
+					return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Displaying " + animName}}}, nil, nil
+				}
+			}
+			return nil, nil, fmt.Errorf("animation %q not found", animName)
+		}))
+	}
+}
+
+func (s *server) Run(ctx context.Context) {
 	defer s.cancel()
+
+	if err := s.watcher.Watch(s.registerTools); err != nil {
+		s.logger.Warn("failed to start config watcher", "err", err)
+	}
+
 	if s.v != nil {
-		s.v.Show(s.keeper.current())
+		s.v.Show(initialAnimation(s.watcher.Get()))
 	}
 
 	port, err := s.availablePort()
@@ -97,7 +131,8 @@ func (s server) Run(ctx context.Context) {
 	}
 	s.logger.Info("MCP server listening", "addr", ln.Addr().String())
 
-	httpSrv := &http.Server{Handler: s.handler}
+	mcpHandler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server { return s.mcpServer }, nil)
+	httpSrv := &http.Server{Handler: mcpHandler}
 
 	go func() {
 		ch := make(chan os.Signal, 1)
@@ -119,19 +154,7 @@ func (s server) Run(ctx context.Context) {
 	}
 }
 
-func configReloadMiddleware(k *keeper, notify func(), logger *slog.Logger, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		changed, err := k.reloadIfUpdated()
-		if err != nil {
-			logger.Warn("config reload failed", "err", err)
-		} else if changed {
-			notify()
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func (s server) availablePort() (int, error) {
+func (s *server) availablePort() (int, error) {
 	if s.portNum != 0 {
 		return s.portNum, nil
 	}

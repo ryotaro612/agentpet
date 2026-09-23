@@ -24,6 +24,16 @@ package internal
 //     o.y -= dy;
 //     [w setFrameOrigin:o];
 // }
+//
+// void showWindowNative(void* ptr) {
+//     NSWindow* w = (__bridge NSWindow*)ptr;
+//     [w makeKeyAndOrderFront:nil];
+// }
+//
+// void hideWindowNative(void* ptr) {
+//     NSWindow* w = (__bridge NSWindow*)ptr;
+//     [w orderOut:nil];
+// }
 import "C"
 import "unsafe"
 
@@ -33,4 +43,12 @@ func SetupWindow(window unsafe.Pointer) {
 
 func MoveWindow(window unsafe.Pointer, dx, dy float64) {
 	C.moveWindow(window, C.double(dx), C.double(dy))
+}
+
+func ShowWindow(window unsafe.Pointer) {
+	C.showWindowNative(window)
+}
+
+func HideWindow(window unsafe.Pointer) {
+	C.hideWindowNative(window)
 }

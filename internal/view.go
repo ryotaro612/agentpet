@@ -56,6 +56,16 @@ func (v *view) Show(anim animation) {
 	}
 }
 
+func (v *view) ShowWindow() {
+	win := v.w.Window()
+	v.w.Dispatch(func() { ShowWindow(win) })
+}
+
+func (v *view) HideWindow() {
+	win := v.w.Window()
+	v.w.Dispatch(func() { HideWindow(win) })
+}
+
 func (v *view) Run(ctx context.Context) {
 	defer v.w.Destroy()
 	go v.dispatch(ctx)
