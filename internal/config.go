@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/BurntSushi/toml"
@@ -8,30 +9,39 @@ import (
 
 func LoadConfig(path string) (Config, error) {
 	var cfg Config
-	_, err := toml.DecodeFile(path, &cfg)
-	return cfg, err
+	if _, err := toml.DecodeFile(path, &cfg); err != nil {
+		return Config{}, err
+	}
+	if err := cfg.validate(); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
 }
 
 func (c Config) validate() error {
+	var errs []error
 	if c.Port < 0 || c.Port > 65535 {
-		return fmt.Errorf("port %d is out of range: must be between 0 and 65535", c.Port)
+		errs = append(errs, fmt.Errorf("port %d is out of range: must be between 0 and 65535", c.Port))
 	}
 	if c.Frame.isPartial() {
-		return fmt.Errorf("config frame: both height and width are required")
+		errs = append(errs, fmt.Errorf("config frame: both height and width are required"))
 	}
 	for _, pet := range c.Pets {
 		if pet.Frame.isPartial() {
-			return fmt.Errorf("pet %q frame: both height and width are required", pet.Name)
+			errs = append(errs, fmt.Errorf("pet %q frame: both height and width are required", pet.Name))
+		}
+		if len(pet.Animations) == 0 {
+			errs = append(errs, fmt.Errorf("pet %q has no animations", pet.Name))
 		}
 		for _, anim := range pet.Animations {
 			if anim.Frame.isPartial() {
-				return fmt.Errorf("animation %q frame: both height and width are required", anim.Name)
+				errs = append(errs, fmt.Errorf("animation %q frame: both height and width are required", anim.Name))
 			}
 			if !anim.Frame.isComplete() && !pet.Frame.isComplete() && !c.Frame.isComplete() {
-				return fmt.Errorf("animation %q in pet %q: frame is required", anim.Name, pet.Name)
+				errs = append(errs, fmt.Errorf("animation %q in pet %q: frame is required", anim.Name, pet.Name))
 			}
 			if anim.File == "" {
-				return fmt.Errorf("animation %q in pet %q: filepath is required", anim.Name, pet.Name)
+				errs = append(errs, fmt.Errorf("animation %q in pet %q: filepath is required", anim.Name, pet.Name))
 			}
 		}
 	}
@@ -44,10 +54,10 @@ func (c Config) validate() error {
 			}
 		}
 		if !found {
-			return fmt.Errorf("pet %q not found in pets", c.Pet)
+			errs = append(errs, fmt.Errorf("pet %q not found in pets", c.Pet))
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func (r ResolutionConfig) isPartial() bool {

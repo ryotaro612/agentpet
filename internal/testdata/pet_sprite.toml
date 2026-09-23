@@ -5,3 +5,7 @@ fps  = 8
 [pets.frame]
 height = 32
 width  = 32
+
+[[pets.animations]]
+name     = "idle"
+filepath = "idle.png"

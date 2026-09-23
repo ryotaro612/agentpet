@@ -1,12 +1,17 @@
 [[pets]]
 name = "cat"
 
+[pets.frame]
+height = 32
+width  = 32
+
 [pets.window]
 height = 320
 width  = 480
 
 [[pets.animations]]
-name = "walk"
+name     = "walk"
+filepath = "walk.png"
 
 [pets.animations.window]
 height = 160

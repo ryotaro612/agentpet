@@ -1,0 +1,6 @@
+[[pets]]
+name = "cat"
+
+[pets.frame]
+height = 32
+width  = 32
