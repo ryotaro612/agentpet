@@ -5,8 +5,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/ryotaro612/agentpet/internal/config"
 	internal "github.com/ryotaro612/agentpet/internal"
+	"github.com/ryotaro612/agentpet/internal/config"
+	"github.com/ryotaro612/agentpet/internal/view"
 )
 
 func main() {
@@ -27,7 +28,7 @@ func main() {
 
 	watcher := config.NewConfigWatcher(ctx, args.ConfigFile, cfg, logger)
 
-	v := internal.NewView()
+	v := view.New(logger)
 	s := internal.NewServer(watcher, v, cfg.Port, logger, cancel)
 	go s.Run(ctx)
 	v.Run(ctx)

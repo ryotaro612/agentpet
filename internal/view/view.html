@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+  cursor: default;
+  user-select: none;
+}
+canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+</style>
+</head>
+<body>
+<canvas id="sprite"></canvas>
+<script>
+var animTimer = null;
+
+function showAnimation(src, fps, frameWidth, frameHeight) {
+  var canvas = document.getElementById('sprite');
+  var ctx = canvas.getContext('2d');
+  var img = new Image();
+  img.onload = function() {
+    var cols = Math.floor(img.width / frameWidth);
+    var rows = Math.floor(img.height / frameHeight);
+    var frameCount = cols * rows;
+    canvas.width = frameWidth;
+    canvas.height = frameHeight;
+    var frame = 0;
+    if (animTimer) clearInterval(animTimer);
+    animTimer = setInterval(function() {
+      var col = frame % cols;
+      var row = Math.floor(frame / cols);
+      ctx.clearRect(0, 0, frameWidth, frameHeight);
+      ctx.drawImage(img, col * frameWidth, row * frameHeight,
+                    frameWidth, frameHeight,
+                    0, 0, frameWidth, frameHeight);
+      frame = (frame + 1) % frameCount;
+    }, 1000 / fps);
+  };
+  img.src = src;
+}
+
+var dragging = false, lastX, lastY;
+document.addEventListener('mousedown', function(e) {
+  dragging = true; lastX = e.screenX; lastY = e.screenY;
+});
+document.addEventListener('mousemove', function(e) {
+  if (!dragging) return;
+  window.moveWindow(e.screenX - lastX, e.screenY - lastY);
+  lastX = e.screenX; lastY = e.screenY;
+});
+document.addEventListener('mouseup', function() { dragging = false; });
+
+window._viewReady();
+</script>
+</body>
+</html>

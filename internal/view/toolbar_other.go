@@ -1,6 +1,6 @@
 //go:build !darwin
 
-package internal
+package view
 
 import "unsafe"
 

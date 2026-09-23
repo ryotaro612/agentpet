@@ -1,4 +1,6 @@
-package internal
+//go:build darwin
+
+package view
 
 // #cgo CFLAGS: -x objective-c
 // #cgo LDFLAGS: -framework Cocoa -framework WebKit
