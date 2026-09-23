@@ -22,6 +22,11 @@ type nameInput struct {
 	Name string `json:"name"`
 }
 
+type changePetInput struct {
+	Name      string `json:"name"`
+	Animation string `json:"animation"`
+}
+
 type server struct {
 	watcher   *config.Watcher
 	v         *view.View
@@ -75,20 +80,31 @@ func NewServer(w *config.Watcher, v *view.View, port int, logger *slog.Logger, c
 
 
 func buildEnumSchema(param, description string, values []string) json.RawMessage {
-	type property struct {
-		Type        string   `json:"type"`
-		Description string   `json:"description"`
-		Enum        []string `json:"enum"`
-	}
-	type schema struct {
-		Type       string              `json:"type"`
-		Properties map[string]property `json:"properties"`
-		Required   []string            `json:"required"`
-	}
-	b, _ := json.Marshal(schema{
-		Type:       "object",
-		Properties: map[string]property{param: {Type: "string", Description: description, Enum: values}},
-		Required:   []string{param},
+	b, _ := json.Marshal(map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			param: map[string]any{"type": "string", "description": description, "enum": values},
+		},
+		"required": []string{param},
+	})
+	return json.RawMessage(b)
+}
+
+func buildChangePetSchema(petNames []string) json.RawMessage {
+	b, _ := json.Marshal(map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"name": map[string]any{
+				"type":        "string",
+				"description": "Name of the pet to switch to",
+				"enum":        petNames,
+			},
+			"animation": map[string]any{
+				"type":        "string",
+				"description": "Name of the animation to activate on the new pet",
+			},
+		},
+		"required": []string{"name"},
 	})
 	return json.RawMessage(b)
 }
@@ -132,10 +148,10 @@ func (s *server) registerTools() {
 		mcp.AddTool(s.mcpServer, &mcp.Tool{
 			Name:        "change_pet",
 			Description: "Switch the active pet",
-			InputSchema: buildEnumSchema("name", "Name of the pet to switch to", otherPets),
-		}, func(_ context.Context, _ *mcp.CallToolRequest, input nameInput) (*mcp.CallToolResult, any, error) {
+			InputSchema: buildChangePetSchema(otherPets),
+		}, func(_ context.Context, _ *mcp.CallToolRequest, input changePetInput) (*mcp.CallToolResult, any, error) {
 			s.mu.Lock()
-			newK, err := s.k.ChangePet(input.Name)
+			newK, err := s.k.ChangePet(input.Name, input.Animation)
 			if err != nil {
 				s.mu.Unlock()
 				return nil, nil, err

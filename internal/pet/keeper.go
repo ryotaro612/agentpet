@@ -46,20 +46,36 @@ func (k Keeper) PlayAnimation(name string) (Keeper, error) {
 	return k, fmt.Errorf("animation %q not found for pet %q", name, k.currentPet)
 }
 
-func (k Keeper) ChangePet(name string) (Keeper, error) {
-	anims, ok := k.pets[name]
+// ChangePet switches to petName. If animName is non-empty the named animation
+// is activated; otherwise the first live animation is used.
+func (k Keeper) ChangePet(petName, animName string) (Keeper, error) {
+	anims, ok := k.pets[petName]
 	if !ok {
-		return k, fmt.Errorf("pet %q not found", name)
+		return k, fmt.Errorf("pet %q not found", petName)
+	}
+	if animName != "" {
+		for _, a := range anims {
+			if a.Name != animName {
+				continue
+			}
+			if err := a.live(); err != nil {
+				return k, fmt.Errorf("animation %q unavailable: %w", animName, err)
+			}
+			k.currentPet = petName
+			k.current = a
+			return k, nil
+		}
+		return k, fmt.Errorf("animation %q not found for pet %q", animName, petName)
 	}
 	for _, a := range anims {
 		if a.live() != nil {
 			continue
 		}
-		k.currentPet = name
+		k.currentPet = petName
 		k.current = a
 		return k, nil
 	}
-	return k, fmt.Errorf("pet %q has no available animations", name)
+	return k, fmt.Errorf("pet %q has no available animations", petName)
 }
 
 func (k Keeper) CurrentAnimation() Animation {
