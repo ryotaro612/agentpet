@@ -115,8 +115,7 @@ func (v *View) dispatch(ctx context.Context) {
 			v.w.Dispatch(func() {
 				window, displayFrame := anim.Layout()
 				if window.NonZero() {
-					v.w.SetSize(window.Width, window.Height, webview.HintNone)
-					SetupWindow(v.w.Window())
+					SetWindowSize(v.w.Window(), window.Width, window.Height)
 				}
 				fps, fpsErr := anim.CalcFps()
 				if fpsErr != nil {
