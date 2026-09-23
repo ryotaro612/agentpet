@@ -113,8 +113,9 @@ func (v *View) dispatch(ctx context.Context) {
 			return
 		case anim := <-v.animCh:
 			v.w.Dispatch(func() {
-				if dim := anim.WindowDim(); dim.NonZero() {
-					v.w.SetSize(dim.Width, dim.Height, webview.HintNone)
+				window, displayFrame := anim.Layout()
+				if window.NonZero() {
+					v.w.SetSize(window.Width, window.Height, webview.HintNone)
 					SetupWindow(v.w.Window())
 				}
 				fps, fpsErr := anim.CalcFps()
@@ -127,8 +128,10 @@ func (v *View) dispatch(ctx context.Context) {
 				if filePath == "" {
 					return
 				}
-				v.w.Eval(fmt.Sprintf("showAnimation(%q, %d, %d, %d)",
-					"file://"+filePath, fps, anim.Frame.Width, anim.Frame.Height))
+				v.w.Eval(fmt.Sprintf("showAnimation(%q, %d, %d, %d, %d, %d)",
+					"file://"+filePath, fps,
+					anim.Frame.Width, anim.Frame.Height,
+					displayFrame.Width, displayFrame.Height))
 			})
 		}
 	}

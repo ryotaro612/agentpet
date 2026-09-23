@@ -21,7 +21,7 @@ canvas {
 <script>
 var animTimer = null;
 
-function showAnimation(src, fps, frameWidth, frameHeight) {
+function showAnimation(src, fps, frameWidth, frameHeight, displayWidth, displayHeight) {
   var canvas = document.getElementById('sprite');
   var ctx = canvas.getContext('2d');
   var img = new Image();
@@ -29,17 +29,17 @@ function showAnimation(src, fps, frameWidth, frameHeight) {
     var cols = Math.floor(img.width / frameWidth);
     var rows = Math.floor(img.height / frameHeight);
     var frameCount = cols * rows;
-    canvas.width = frameWidth;
-    canvas.height = frameHeight;
+    canvas.width = displayWidth;
+    canvas.height = displayHeight;
     var frame = 0;
     if (animTimer) clearInterval(animTimer);
     animTimer = setInterval(function() {
       var col = frame % cols;
       var row = Math.floor(frame / cols);
-      ctx.clearRect(0, 0, frameWidth, frameHeight);
+      ctx.clearRect(0, 0, displayWidth, displayHeight);
       ctx.drawImage(img, col * frameWidth, row * frameHeight,
                     frameWidth, frameHeight,
-                    0, 0, frameWidth, frameHeight);
+                    0, 0, displayWidth, displayHeight);
       frame = (frame + 1) % frameCount;
     }, 1000 / fps);
   };

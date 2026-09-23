@@ -31,16 +31,7 @@ func (d Dimension) NonZero() bool {
 }
 
 func (a Animation) live() error {
-	path, err := a.AbsFilePath()
-	if err != nil {
-		return err
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, _, err = image.DecodeConfig(f)
+	_, err := a.imageSize()
 	return err
 }
 
@@ -48,29 +39,66 @@ func (a Animation) AbsFilePath() (string, error) {
 	return filepath.Abs(a.filePath)
 }
 
-// WindowDim returns the display window size: a.window if set, a.Frame if set,
-// otherwise the full image dimensions.
-func (a Animation) WindowDim() Dimension {
-	if a.window.NonZero() {
-		return a.window
-	}
-	if a.Frame.NonZero() {
-		return a.Frame
-	}
+func (a Animation) imageSize() (Dimension, error) {
 	path, err := a.AbsFilePath()
 	if err != nil {
-		return Dimension{}
+		return Dimension{}, err
 	}
 	f, err := os.Open(path)
 	if err != nil {
-		return Dimension{}
+		return Dimension{}, err
 	}
 	defer f.Close()
 	cfg, _, err := image.DecodeConfig(f)
 	if err != nil {
-		return Dimension{}
+		return Dimension{}, err
 	}
-	return Dimension{Width: cfg.Width, Height: cfg.Height}
+	return Dimension{Width: cfg.Width, Height: cfg.Height}, nil
+}
+
+// Layout returns the OS window size and the display frame size for rendering.
+// If a.window has exactly one dimension set, the other is inferred from the
+// image's aspect ratio. If the window is smaller than a.Frame in either
+// dimension, the display frame is scaled down to fit within the window while
+// preserving the frame's aspect ratio.
+func (a Animation) Layout() (window, displayFrame Dimension) {
+	w, h := a.window.Width, a.window.Height
+	switch {
+	case w > 0 && h > 0:
+		window = a.window
+	case w > 0 || h > 0:
+		if img, err := a.imageSize(); err == nil && img.Width > 0 && img.Height > 0 {
+			if w > 0 {
+				h = w * img.Height / img.Width
+			} else {
+				w = h * img.Width / img.Height
+			}
+		}
+		window = Dimension{Width: w, Height: h}
+	default:
+		if a.Frame.NonZero() {
+			window = a.Frame
+		} else {
+			window, _ = a.imageSize()
+		}
+	}
+
+	if !a.Frame.NonZero() {
+		displayFrame = window
+		return
+	}
+	if !window.NonZero() || (window.Width >= a.Frame.Width && window.Height >= a.Frame.Height) {
+		displayFrame = a.Frame
+		return
+	}
+	scaleW := float64(window.Width) / float64(a.Frame.Width)
+	scaleH := float64(window.Height) / float64(a.Frame.Height)
+	scale := min(scaleW, scaleH)
+	displayFrame = Dimension{
+		Width:  int(float64(a.Frame.Width) * scale),
+		Height: int(float64(a.Frame.Height) * scale),
+	}
+	return
 }
 
 // CalcFps returns a.fps when set, otherwise infers fps from the number of
@@ -83,23 +111,14 @@ func (a Animation) CalcFps() (int, error) {
 	if a.Frame.Width == 0 || a.Frame.Height == 0 {
 		return 0, fmt.Errorf("frame dimensions not set")
 	}
-	path, err := a.AbsFilePath()
+	img, err := a.imageSize()
 	if err != nil {
 		return 0, err
 	}
-	f, err := os.Open(path)
-	if err != nil {
-		return 0, err
-	}
-	defer f.Close()
-	cfg, _, err := image.DecodeConfig(f)
-	if err != nil {
-		return 0, err
-	}
-	n := (cfg.Width / a.Frame.Width) * (cfg.Height / a.Frame.Height)
+	n := (img.Width / a.Frame.Width) * (img.Height / a.Frame.Height)
 	if n == 0 {
 		return 0, fmt.Errorf("computed zero frames from image %dx%d with frame %dx%d",
-			cfg.Width, cfg.Height, a.Frame.Width, a.Frame.Height)
+			img.Width, img.Height, a.Frame.Width, a.Frame.Height)
 	}
 	return n, nil
 }
