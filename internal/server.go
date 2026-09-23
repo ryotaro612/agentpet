@@ -119,10 +119,11 @@ func (s *server) registerTools() {
 		InputSchema: buildEnumSchema("name", "Name of the animation to play", animNames),
 	}, func(_ context.Context, _ *mcp.CallToolRequest, input nameInput) (*mcp.CallToolResult, any, error) {
 		s.mu.Lock()
-		newK, anim, err := s.k.playAnimation(input.Name)
+		newK, err := s.k.playAnimation(input.Name)
 		if err == nil {
 			s.k = newK
 		}
+		anim := s.k.currentAnimation()
 		s.mu.Unlock()
 		if err != nil {
 			return nil, nil, err
@@ -140,13 +141,14 @@ func (s *server) registerTools() {
 			InputSchema: buildEnumSchema("name", "Name of the pet to switch to", otherPets),
 		}, func(_ context.Context, _ *mcp.CallToolRequest, input nameInput) (*mcp.CallToolResult, any, error) {
 			s.mu.Lock()
-			newK, anim, err := s.k.changePet(input.Name)
+			newK, err := s.k.changePet(input.Name)
 			if err != nil {
 				s.mu.Unlock()
 				return nil, nil, err
 			}
 			s.k = newK
 			s.registerTools()
+			anim := s.k.currentAnimation()
 			s.mu.Unlock()
 			if s.v != nil {
 				s.v.Show(toViewAnim(anim))
@@ -160,9 +162,9 @@ func (s *server) onConfigChange(cfg config.Config) {
 	s.mu.Lock()
 	s.k = newKeeper(cfg)
 	s.registerTools()
-	anim, ok := s.k.currentAnimation()
+	anim := s.k.currentAnimation()
 	s.mu.Unlock()
-	if s.v != nil && ok {
+	if s.v != nil {
 		s.v.Show(toViewAnim(anim))
 	}
 }
@@ -190,11 +192,9 @@ func (s *server) Run(ctx context.Context) {
 
 	if s.v != nil {
 		s.mu.RLock()
-		anim, ok := s.k.currentAnimation()
+		anim := s.k.currentAnimation()
 		s.mu.RUnlock()
-		if ok {
-			s.v.Show(toViewAnim(anim))
-		}
+		s.v.Show(toViewAnim(anim))
 	}
 
 	mux := http.NewServeMux()

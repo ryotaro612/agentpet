@@ -10,7 +10,6 @@ type keeper struct {
 	pets       map[string][]animation
 	currentPet string
 	current    animation
-	hasCurrent bool
 }
 
 func newKeeper(cfg config.Config) keeper {
@@ -25,34 +24,32 @@ func newKeeper(cfg config.Config) keeper {
 	}
 	if anims := k.pets[k.currentPet]; len(anims) > 0 {
 		k.current = anims[0]
-		k.hasCurrent = true
 	}
 	return k
 }
 
-func (k keeper) playAnimation(name string) (keeper, animation, error) {
+func (k keeper) playAnimation(name string) (keeper, error) {
 	anims, ok := k.pets[k.currentPet]
 	if !ok {
-		return k, animation{}, fmt.Errorf("current pet %q not found", k.currentPet)
+		return k, fmt.Errorf("current pet %q not found", k.currentPet)
 	}
 	for _, a := range anims {
 		if a.name != name {
 			continue
 		}
 		if err := a.live(); err != nil {
-			return k, animation{}, fmt.Errorf("animation %q unavailable: %w", name, err)
+			return k, fmt.Errorf("animation %q unavailable: %w", name, err)
 		}
 		k.current = a
-		k.hasCurrent = true
-		return k, a, nil
+		return k, nil
 	}
-	return k, animation{}, fmt.Errorf("animation %q not found for pet %q", name, k.currentPet)
+	return k, fmt.Errorf("animation %q not found for pet %q", name, k.currentPet)
 }
 
-func (k keeper) changePet(name string) (keeper, animation, error) {
+func (k keeper) changePet(name string) (keeper, error) {
 	anims, ok := k.pets[name]
 	if !ok {
-		return k, animation{}, fmt.Errorf("pet %q not found", name)
+		return k, fmt.Errorf("pet %q not found", name)
 	}
 	for _, a := range anims {
 		if a.live() != nil {
@@ -60,14 +57,13 @@ func (k keeper) changePet(name string) (keeper, animation, error) {
 		}
 		k.currentPet = name
 		k.current = a
-		k.hasCurrent = true
-		return k, a, nil
+		return k, nil
 	}
-	return k, animation{}, fmt.Errorf("pet %q has no available animations", name)
+	return k, fmt.Errorf("pet %q has no available animations", name)
 }
 
-func (k keeper) currentAnimation() (animation, bool) {
-	return k.current, k.hasCurrent
+func (k keeper) currentAnimation() animation {
+	return k.current
 }
 
 func (k keeper) animationNames() []string {
