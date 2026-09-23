@@ -1,19 +1,31 @@
 APP_NAME   := agentpet
 APP_BUNDLE := dist/$(APP_NAME).app
+BINARY     := dist/$(APP_NAME)
+CLIENT     := dist/petowner
 ICON_SRC   := asserts/icon.png
 PLIST_SRC  := asserts/Info.plist
 ICONSET    := dist/AppIcon.iconset
+ASSETS     := $(ICON_SRC) $(PLIST_SRC)
+
+GO_SRCS  := main.go $(shell find internal -name '*.go')
+CMD_SRCS := $(wildcard cmd/*.go)
 
 ##@ Build
-build: ## Build the agentpet binary.
-	mkdir -p dist
-	go build -o dist/$(APP_NAME) .
+build: $(BINARY) ## Build the agentpet binary.
 
-app: ## Package agentpet as a macOS .app bundle.
+$(BINARY): $(GO_SRCS) | dist
+	go build -o $@ .
+
+petowner: $(CLIENT) ## Build the petowner client binary.
+
+$(CLIENT): $(CMD_SRCS) | dist
+	go build -o $@ ./cmd/
+
+app: $(BINARY) $(ASSETS) ## Package agentpet as a macOS .app bundle.
 	@mkdir -p $(APP_BUNDLE)/Contents/MacOS \
 	           $(APP_BUNDLE)/Contents/Resources \
 	           $(ICONSET)
-	go build -o $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME) .
+	@cp $(BINARY) $(APP_BUNDLE)/Contents/MacOS/$(APP_NAME)
 	@sips -z 16  16  $(ICON_SRC) --out $(ICONSET)/icon_16x16.png      > /dev/null
 	@sips -z 32  32  $(ICON_SRC) --out $(ICONSET)/icon_16x16@2x.png   > /dev/null
 	@sips -z 32  32  $(ICON_SRC) --out $(ICONSET)/icon_32x32.png      > /dev/null
@@ -29,6 +41,9 @@ app: ## Package agentpet as a macOS .app bundle.
 	@cp $(PLIST_SRC) $(APP_BUNDLE)/Contents/Info.plist
 	@echo "Built $(APP_BUNDLE)"
 
+dist:
+	@mkdir -p dist
+
 ##@ Test
 test: ## Run tests.
 	go test ./...
@@ -43,4 +58,4 @@ help: ## Display this help.
 
 .DEFAULT_GOAL := help
 
-.PHONY: build app test clean help
+.PHONY: build petowner app test clean help dist
