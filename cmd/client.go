@@ -21,7 +21,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Subcommands:\n")
 		fmt.Fprintf(os.Stderr, "  animation [name]       change to the named animation, or a random one if omitted\n")
 		fmt.Fprintf(os.Stderr, "  pet <name> [animation] switch to a different pet, optionally activating an animation\n")
-		fmt.Fprintf(os.Stderr, "  pets                   list available pets and their animations\n\n")
+		fmt.Fprintf(os.Stderr, "  pets                   list available pets and their animations\n")
+		fmt.Fprintf(os.Stderr, "  show                   show the pet window\n")
+		fmt.Fprintf(os.Stderr, "  hide                   hide the pet window\n\n")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(os.Args[1:]); err != nil {
@@ -62,6 +64,10 @@ func main() {
 		runErr = cmdPet(ctx, session, args[1:], *verbose)
 	case "pets":
 		runErr = cmdPets(ctx, session, *verbose)
+	case "show":
+		runErr = cmdWindow(ctx, session, "show_window", *verbose)
+	case "hide":
+		runErr = cmdWindow(ctx, session, "hide_window", *verbose)
 	default:
 		fmt.Fprintf(os.Stderr, "error: unknown subcommand %q\n", args[0])
 		fs.Usage()
@@ -91,7 +97,19 @@ func cmdAnimation(ctx context.Context, session *mcp.ClientSession, args []string
 		if len(animTools) == 0 {
 			return fmt.Errorf("no animation tools found")
 		}
-		toolName = animTools[rand.IntN(len(animTools))]
+		candidates := animTools
+		if current := currentAnimToolName(ctx, session); current != "" {
+			others := make([]string, 0, len(animTools)-1)
+			for _, t := range animTools {
+				if t != current {
+					others = append(others, t)
+				}
+			}
+			if len(others) > 0 {
+				candidates = others
+			}
+		}
+		toolName = candidates[rand.IntN(len(candidates))]
 	}
 	if verbose {
 		fmt.Println("calling tool:", toolName)
@@ -102,6 +120,35 @@ func cmdAnimation(ctx context.Context, session *mcp.ClientSession, args []string
 	}
 	printResult(result)
 	return nil
+}
+
+// currentAnimToolName returns the "anim_<name>" tool name of the currently
+// active animation by calling list_pets. Returns "" on any error so the caller
+// can fall back gracefully.
+func currentAnimToolName(ctx context.Context, session *mcp.ClientSession) string {
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "list_pets"})
+	if err != nil || len(result.Content) == 0 {
+		return ""
+	}
+	text, ok := result.Content[0].(*mcp.TextContent)
+	if !ok {
+		return ""
+	}
+	var resp petsResponse
+	if json.Unmarshal([]byte(text.Text), &resp) != nil {
+		return ""
+	}
+	for _, p := range resp.Pets {
+		if !p.Active {
+			continue
+		}
+		for _, a := range p.Animations {
+			if a.Active {
+				return "anim_" + a.Name
+			}
+		}
+	}
+	return ""
 }
 
 func cmdPet(ctx context.Context, session *mcp.ClientSession, args []string, verbose bool) error {
@@ -177,6 +224,18 @@ func cmdPets(ctx context.Context, session *mcp.ClientSession, verbose bool) erro
 			fmt.Printf("  %s%s%s\n", a.Name, animActive, desc)
 		}
 	}
+	return nil
+}
+
+func cmdWindow(ctx context.Context, session *mcp.ClientSession, toolName string, verbose bool) error {
+	if verbose {
+		fmt.Println("calling tool:", toolName)
+	}
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: toolName})
+	if err != nil {
+		return fmt.Errorf("calling %s: %w", toolName, err)
+	}
+	printResult(result)
 	return nil
 }
 

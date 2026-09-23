@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"log/slog"
+	"path/filepath"
 	"sync/atomic"
 
 	"github.com/fsnotify/fsnotify"
@@ -30,10 +31,15 @@ func (w *Watcher) Watch(onChange func(Config)) error {
 	if err != nil {
 		return err
 	}
-	if err := fsw.Add(w.path); err != nil {
+	// Watch the directory so the watch survives atomic-rename saves (vim,
+	// emacs, and most GUI editors write to a temp file then rename it over
+	// the original, which would silently drop an inode-level file watch).
+	dir := filepath.Dir(w.path)
+	if err := fsw.Add(dir); err != nil {
 		fsw.Close()
 		return err
 	}
+	base := filepath.Base(w.path)
 	go func() {
 		defer fsw.Close()
 		for {
@@ -44,15 +50,19 @@ func (w *Watcher) Watch(onChange func(Config)) error {
 				if !ok {
 					return
 				}
-				if event.Has(fsnotify.Write) || event.Has(fsnotify.Create) {
-					cfg, err := LoadConfig(w.path)
-					if err != nil {
-						w.logger.Warn("config reload failed", "err", err)
-						continue
-					}
-					w.current.Store(&cfg)
-					onChange(cfg)
+				if filepath.Base(event.Name) != base {
+					continue
 				}
+				if !event.Has(fsnotify.Write) && !event.Has(fsnotify.Create) && !event.Has(fsnotify.Rename) {
+					continue
+				}
+				cfg, err := LoadConfig(w.path)
+				if err != nil {
+					w.logger.Warn("config reload failed", "err", err)
+					continue
+				}
+				w.current.Store(&cfg)
+				onChange(cfg)
 			case err, ok := <-fsw.Errors:
 				if !ok {
 					return

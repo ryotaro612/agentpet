@@ -6,6 +6,7 @@ package view
 // #cgo LDFLAGS: -framework Cocoa -framework WebKit
 // #import <Cocoa/Cocoa.h>
 // #import <WebKit/WebKit.h>
+// #import <objc/runtime.h>
 //
 // void setupWindow(void* ptr) {
 //     NSWindow* w = (__bridge NSWindow*)ptr;
@@ -17,6 +18,21 @@ package view
 //         WKWebView* webView = (WKWebView*)w.contentView;
 //         [webView setValue:@NO forKey:@"drawsBackground"];
 //     }
+// }
+//
+// // preventTerminateOnHide replaces the webview library's hardcoded YES return
+// // from applicationShouldTerminateAfterLastWindowClosed: with NO, so hiding
+// // the window does not stop the run loop. method_setImplementation is
+// // thread-safe and can be called before the run loop starts.
+// void preventTerminateOnHide(void) {
+//     Class cls = NSClassFromString(@"WebviewAppDelegate");
+//     if (!cls) return;
+//     SEL sel = @selector(applicationShouldTerminateAfterLastWindowClosed:);
+//     Method m = class_getInstanceMethod(cls, sel);
+//     if (!m) return;
+//     method_setImplementation(m, imp_implementationWithBlock(
+//         ^BOOL(id __unused self, NSApplication * __unused app) { return NO; }
+//     ));
 // }
 //
 // // setWindowSize removes the title bar, sets the content size, and centers the
@@ -91,6 +107,10 @@ import "unsafe"
 
 func SetupWindow(window unsafe.Pointer) {
 	C.setupWindow(window)
+}
+
+func PreventTerminateOnHide() {
+	C.preventTerminateOnHide()
 }
 
 func SetWindowSize(window unsafe.Pointer, width, height int) {

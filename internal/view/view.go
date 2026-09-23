@@ -47,6 +47,7 @@ func New(logger *slog.Logger) *View {
 
 	readyCh := make(chan struct{})
 	w := webview.New(false)
+	PreventTerminateOnHide()
 	v := &View{
 		w:        w,
 		animCh:   make(chan pet.Animation, 1),
