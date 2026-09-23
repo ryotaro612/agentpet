@@ -47,6 +47,28 @@ package view
 //     [w setFrameOrigin:origin];
 // }
 //
+// // resizeWindowKeepingPosition resizes the window to the given content
+// // dimensions while preserving the current on-screen position. The window
+// // expands or contracts around its current center point.
+// void resizeWindowKeepingPosition(void* ptr, int width, int height) {
+//     NSWindow* w = (__bridge NSWindow*)ptr;
+//     w.styleMask = NSWindowStyleMaskBorderless | NSWindowStyleMaskResizable;
+//     w.opaque = NO;
+//     w.backgroundColor = [NSColor clearColor];
+//     w.level = NSFloatingWindowLevel;
+//     if ([w.contentView isKindOfClass:[WKWebView class]]) {
+//         WKWebView* webView = (WKWebView*)w.contentView;
+//         [webView setValue:@NO forKey:@"drawsBackground"];
+//     }
+//     CGFloat midX = NSMidX(w.frame);
+//     CGFloat midY = NSMidY(w.frame);
+//     [w setContentSize:NSMakeSize(width, height)];
+//     [w setFrameOrigin:NSMakePoint(
+//         midX - w.frame.size.width / 2.0,
+//         midY - w.frame.size.height / 2.0
+//     )];
+// }
+//
 // void moveWindow(void* ptr, double dx, double dy) {
 //     NSWindow* w = (__bridge NSWindow*)ptr;
 //     NSPoint o = w.frame.origin;
@@ -73,6 +95,10 @@ func SetupWindow(window unsafe.Pointer) {
 
 func SetWindowSize(window unsafe.Pointer, width, height int) {
 	C.setWindowSize(window, C.int(width), C.int(height))
+}
+
+func ResizeWindowKeepingPosition(window unsafe.Pointer, width, height int) {
+	C.resizeWindowKeepingPosition(window, C.int(width), C.int(height))
 }
 
 func MoveWindow(window unsafe.Pointer, dx, dy float64) {

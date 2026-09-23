@@ -24,6 +24,9 @@ type View struct {
 	readyCh  chan struct{}
 	logger   *slog.Logger
 	htmlPath string
+	// shown is set after the first animation is displayed and is accessed only
+	// from Dispatch callbacks, which run on the webview main thread.
+	shown bool
 }
 
 func New(logger *slog.Logger) *View {
@@ -115,7 +118,12 @@ func (v *View) dispatch(ctx context.Context) {
 			v.w.Dispatch(func() {
 				window, displayFrame := anim.Layout()
 				if window.NonZero() {
-					SetWindowSize(v.w.Window(), window.Width, window.Height)
+					if !v.shown {
+						SetWindowSize(v.w.Window(), window.Width, window.Height)
+						v.shown = true
+					} else {
+						ResizeWindowKeepingPosition(v.w.Window(), window.Width, window.Height)
+					}
 				}
 				fps, fpsErr := anim.CalcFps()
 				if fpsErr != nil {
