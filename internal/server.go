@@ -72,21 +72,6 @@ func NewServer(w *config.Watcher, v *view.View, port int, logger *slog.Logger, c
 	return s
 }
 
-func toViewAnim(a pet.Animation) view.Anim {
-	fps, fpsErr := a.CalcFps()
-	dim := a.WindowDim()
-	filePath, _ := a.AbsFilePath()
-	return view.Anim{
-		Name:     a.Name,
-		FPS:      fps,
-		FPSErr:   fpsErr,
-		FrameW:   a.Frame.Width,
-		FrameH:   a.Frame.Height,
-		WinW:     dim.Width,
-		WinH:     dim.Height,
-		FilePath: filePath,
-	}
-}
 
 func buildEnumSchema(param, description string, values []string) json.RawMessage {
 	type property struct {
@@ -130,7 +115,7 @@ func (s *server) registerTools() {
 			return nil, nil, err
 		}
 		if s.v != nil {
-			s.v.Show(toViewAnim(anim))
+			s.v.Show(anim)
 		}
 		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Playing " + input.Name}}}, nil, nil
 	})
@@ -152,7 +137,7 @@ func (s *server) registerTools() {
 			anim := s.k.CurrentAnimation()
 			s.mu.Unlock()
 			if s.v != nil {
-				s.v.Show(toViewAnim(anim))
+				s.v.Show(anim)
 			}
 			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Switched to " + input.Name}}}, nil, nil
 		})
@@ -166,7 +151,7 @@ func (s *server) onConfigChange(cfg config.Config) {
 	anim := s.k.CurrentAnimation()
 	s.mu.Unlock()
 	if s.v != nil {
-		s.v.Show(toViewAnim(anim))
+		s.v.Show(anim)
 	}
 }
 
@@ -195,7 +180,7 @@ func (s *server) Run(ctx context.Context) {
 		s.mu.RLock()
 		anim := s.k.CurrentAnimation()
 		s.mu.RUnlock()
-		s.v.Show(toViewAnim(anim))
+		s.v.Show(anim)
 	}
 
 	mux := http.NewServeMux()

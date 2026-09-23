@@ -26,7 +26,7 @@ type Dimension struct {
 	Height int
 }
 
-func (d Dimension) nonZero() bool {
+func (d Dimension) NonZero() bool {
 	return d.Width > 0 || d.Height > 0
 }
 
@@ -51,10 +51,10 @@ func (a Animation) AbsFilePath() (string, error) {
 // WindowDim returns the display window size: a.window if set, a.Frame if set,
 // otherwise the full image dimensions.
 func (a Animation) WindowDim() Dimension {
-	if a.window.nonZero() {
+	if a.window.NonZero() {
 		return a.window
 	}
-	if a.Frame.nonZero() {
+	if a.Frame.NonZero() {
 		return a.Frame
 	}
 	path, err := a.AbsFilePath()

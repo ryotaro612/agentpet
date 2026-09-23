@@ -10,28 +10,17 @@ import (
 	"text/template"
 	_ "embed"
 
+	"github.com/ryotaro612/agentpet/internal/pet"
 	"github.com/webview/webview"
 )
 
 //go:embed view.html
 var viewHTMLSrc string
 
-// Anim carries pre-computed display parameters for a single spritesheet animation.
-type Anim struct {
-	Name     string
-	FPS      int
-	FPSErr   error
-	FrameW   int
-	FrameH   int
-	WinW     int
-	WinH     int
-	FilePath string
-}
-
 // View wraps the native webview window and drives spritesheet animations.
 type View struct {
 	w        webview.WebView
-	animCh   chan Anim
+	animCh   chan pet.Animation
 	readyCh  chan struct{}
 	logger   *slog.Logger
 	htmlPath string
@@ -57,7 +46,7 @@ func New(logger *slog.Logger) *View {
 	w := webview.New(false)
 	v := &View{
 		w:        w,
-		animCh:   make(chan Anim, 1),
+		animCh:   make(chan pet.Animation, 1),
 		readyCh:  readyCh,
 		logger:   logger,
 		htmlPath: f.Name(),
@@ -80,7 +69,7 @@ func New(logger *slog.Logger) *View {
 }
 
 // Show queues an animation for display, dropping the previous one if unread.
-func (v *View) Show(anim Anim) {
+func (v *View) Show(anim pet.Animation) {
 	select {
 	case v.animCh <- anim:
 	default:
@@ -124,21 +113,22 @@ func (v *View) dispatch(ctx context.Context) {
 			return
 		case anim := <-v.animCh:
 			v.w.Dispatch(func() {
-				if anim.WinW > 0 && anim.WinH > 0 {
-					v.w.SetSize(anim.WinW, anim.WinH, webview.HintNone)
+				if dim := anim.WindowDim(); dim.NonZero() {
+					v.w.SetSize(dim.Width, dim.Height, webview.HintNone)
 					SetupWindow(v.w.Window())
 				}
-				if anim.FPSErr != nil {
+				fps, fpsErr := anim.CalcFps()
+				if fpsErr != nil {
 					v.logger.Warn("skipping animation: cannot compute fps",
-						"animation", anim.Name, "err", anim.FPSErr)
+						"animation", anim.Name, "err", fpsErr)
 					return
 				}
-				if anim.FilePath == "" {
+				filePath, _ := anim.AbsFilePath()
+				if filePath == "" {
 					return
 				}
-				url := "file://" + anim.FilePath
 				v.w.Eval(fmt.Sprintf("showAnimation(%q, %d, %d, %d)",
-					url, anim.FPS, anim.FrameW, anim.FrameH))
+					"file://"+filePath, fps, anim.Frame.Width, anim.Frame.Height))
 			})
 		}
 	}
