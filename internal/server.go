@@ -74,14 +74,16 @@ func NewServer(w *config.Watcher, v *view.View, port int, logger *slog.Logger, c
 func toViewAnim(a animation) view.Anim {
 	fps, fpsErr := a.calcFps()
 	dim := a.windowDim()
+	filePath, _ := a.absFilePath()
 	return view.Anim{
-		Name:   a.name,
-		FPS:    fps,
-		FPSErr: fpsErr,
-		FrameW: a.frame.width,
-		FrameH: a.frame.height,
-		WinW:   dim.width,
-		WinH:   dim.height,
+		Name:     a.name,
+		FPS:      fps,
+		FPSErr:   fpsErr,
+		FrameW:   a.frame.width,
+		FrameH:   a.frame.height,
+		WinW:     dim.width,
+		WinH:     dim.height,
+		FilePath: filePath,
 	}
 }
 
@@ -191,10 +193,7 @@ func (s *server) Run(ctx context.Context) {
 	addr := ln.Addr().String()
 	s.logger.Info("MCP server listening", "addr", addr)
 
-	_, portStr, _ := net.SplitHostPort(addr)
-
 	if s.v != nil {
-		s.v.SetServerAddr("127.0.0.1:" + portStr)
 		if a := s.k.currentAnimation(); a != nil {
 			s.v.Show(toViewAnim(*a))
 		}

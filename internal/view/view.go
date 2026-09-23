@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"text/template"
 	_ "embed"
 
@@ -18,22 +18,23 @@ var viewHTMLSrc string
 
 // Anim carries pre-computed display parameters for a single spritesheet animation.
 type Anim struct {
-	Name    string
-	FPS     int
-	FPSErr  error
-	FrameW  int
-	FrameH  int
-	WinW    int
-	WinH    int
+	Name     string
+	FPS      int
+	FPSErr   error
+	FrameW   int
+	FrameH   int
+	WinW     int
+	WinH     int
+	FilePath string
 }
 
 // View wraps the native webview window and drives spritesheet animations.
 type View struct {
-	w          webview.WebView
-	animCh     chan Anim
-	readyCh    chan struct{}
-	serverAddr atomic.Pointer[string]
-	logger     *slog.Logger
+	w        webview.WebView
+	animCh   chan Anim
+	readyCh  chan struct{}
+	logger   *slog.Logger
+	htmlPath string
 }
 
 func New(logger *slog.Logger) *View {
@@ -42,15 +43,24 @@ func New(logger *slog.Logger) *View {
 	if err := tmpl.Execute(&buf, nil); err != nil {
 		panic("view: failed to render HTML template: " + err.Error())
 	}
-	html := buf.String()
+
+	f, err := os.CreateTemp("", "agentpet-*.html")
+	if err != nil {
+		panic("view: failed to create temp HTML file: " + err.Error())
+	}
+	if _, err := f.WriteString(buf.String()); err != nil {
+		panic("view: failed to write HTML: " + err.Error())
+	}
+	f.Close()
 
 	readyCh := make(chan struct{})
 	w := webview.New(false)
 	v := &View{
-		w:       w,
-		animCh:  make(chan Anim, 1),
-		readyCh: readyCh,
-		logger:  logger,
+		w:        w,
+		animCh:   make(chan Anim, 1),
+		readyCh:  readyCh,
+		logger:   logger,
+		htmlPath: f.Name(),
 	}
 
 	win := w.Window()
@@ -65,13 +75,8 @@ func New(logger *slog.Logger) *View {
 		once.Do(func() { close(readyCh) })
 	})
 
-	w.SetHtml(html)
+	w.Navigate("file://" + f.Name())
 	return v
-}
-
-// SetServerAddr tells the view which base URL to use for /image requests.
-func (v *View) SetServerAddr(addr string) {
-	v.serverAddr.Store(&addr)
 }
 
 // Show queues an animation for display, dropping the previous one if unread.
@@ -97,6 +102,7 @@ func (v *View) HideWindow() {
 // Run starts the webview event loop. It blocks until ctx is cancelled or the
 // window is closed.
 func (v *View) Run(ctx context.Context) {
+	defer os.Remove(v.htmlPath)
 	defer v.w.Destroy()
 	go v.dispatch(ctx)
 	go func() {
@@ -127,11 +133,10 @@ func (v *View) dispatch(ctx context.Context) {
 						"animation", anim.Name, "err", anim.FPSErr)
 					return
 				}
-				p := v.serverAddr.Load()
-				if p == nil {
+				if anim.FilePath == "" {
 					return
 				}
-				url := "http://" + *p + "/image"
+				url := "file://" + anim.FilePath
 				v.w.Eval(fmt.Sprintf("showAnimation(%q, %d, %d, %d)",
 					url, anim.FPS, anim.FrameW, anim.FrameH))
 			})
