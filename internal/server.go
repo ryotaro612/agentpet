@@ -191,8 +191,10 @@ func (s *server) Run(ctx context.Context) {
 	addr := ln.Addr().String()
 	s.logger.Info("MCP server listening", "addr", addr)
 
+	_, portStr, _ := net.SplitHostPort(addr)
+
 	if s.v != nil {
-		s.v.SetServerAddr(addr)
+		s.v.SetServerAddr("127.0.0.1:" + portStr)
 		if a := s.k.currentAnimation(); a != nil {
 			s.v.Show(toViewAnim(*a))
 		}
