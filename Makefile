@@ -18,7 +18,7 @@ $(BINARY): $(GO_SRCS) | dist
 
 petowner: $(CLIENT) ## Build the petowner client binary.
 
-$(CLIENT): $(CMD_SRCS) | dist
+$(CLIENT): $(CMD_SRCS) | dist ## Build the petowner client binary.
 	go build -o $@ ./cmd/
 
 app: $(BINARY) $(ASSETS) ## Package agentpet as a macOS .app bundle.

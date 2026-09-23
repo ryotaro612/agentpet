@@ -1,2 +1,4 @@
 .tool-versions
 temp.toml
+.DS_Store
+dist/
