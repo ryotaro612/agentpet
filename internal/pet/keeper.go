@@ -82,6 +82,23 @@ func (k Keeper) CurrentAnimation() Animation {
 	return k.current
 }
 
+func (k Keeper) CurrentPetName() string {
+	return k.currentPet
+}
+
+type PetInfo struct {
+	Name       string
+	Animations []Animation
+}
+
+func (k Keeper) AllPets() []PetInfo {
+	infos := make([]PetInfo, 0, len(k.pets))
+	for name, anims := range k.pets {
+		infos = append(infos, PetInfo{Name: name, Animations: anims})
+	}
+	return infos
+}
+
 func (k Keeper) Animations() []Animation {
 	return k.pets[k.currentPet]
 }

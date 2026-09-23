@@ -74,6 +74,53 @@ func NewServer(w *config.Watcher, v *view.View, port int, logger *slog.Logger, c
 		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Window is now hidden"}}}, nil, nil
 	})
 
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "list_pets",
+		Description: "List all available pets and their animations, indicating which are currently active",
+	}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+		s.mu.RLock()
+		allPets := s.k.AllPets()
+		currentPet := s.k.CurrentPetName()
+		currentAnim := s.k.CurrentAnimation().Name
+		s.mu.RUnlock()
+
+		type animEntry struct {
+			Name        string `json:"name"`
+			Description string `json:"description,omitempty"`
+			Active      bool   `json:"active,omitempty"`
+		}
+		type petEntry struct {
+			Name       string      `json:"name"`
+			Active     bool        `json:"active,omitempty"`
+			Animations []animEntry `json:"animations"`
+		}
+		type response struct {
+			Pets []petEntry `json:"pets"`
+		}
+
+		pets := make([]petEntry, 0, len(allPets))
+		for _, p := range allPets {
+			anims := make([]animEntry, 0, len(p.Animations))
+			for _, a := range p.Animations {
+				anims = append(anims, animEntry{
+					Name:        a.Name,
+					Description: a.Description,
+					Active:      p.Name == currentPet && a.Name == currentAnim,
+				})
+			}
+			pets = append(pets, petEntry{
+				Name:       p.Name,
+				Active:     p.Name == currentPet,
+				Animations: anims,
+			})
+		}
+		b, err := json.Marshal(response{Pets: pets})
+		if err != nil {
+			return nil, nil, err
+		}
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(b)}}}, nil, nil
+	})
+
 	s.registerTools()
 	return s
 }
