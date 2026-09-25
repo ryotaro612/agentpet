@@ -5,8 +5,9 @@ import (
 	"log"
 	"os"
 
-	internal "github.com/ryotaro612/agentpet/internal"
+	"github.com/ryotaro612/agentpet/internal"
 	"github.com/ryotaro612/agentpet/internal/config"
+	"github.com/ryotaro612/agentpet/internal/server"
 	"github.com/ryotaro612/agentpet/internal/view"
 )
 
@@ -32,7 +33,7 @@ func main() {
 	}
 
 	v := view.New(logger)
-	s := internal.NewServer(cfgCh, v, cfg.Port, cfg, logger, cancel)
+	s := server.NewServer(cfgCh, v, cfg.Port, cfg, logger, cancel)
 	go s.Run(ctx)
 	v.Run(ctx)
 }

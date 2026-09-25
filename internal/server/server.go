@@ -1,4 +1,4 @@
-package internal
+package server
 
 import (
 	"context"
@@ -24,17 +24,19 @@ type changePetInput struct {
 }
 
 type server struct {
-	cfgCh         <-chan config.Config
-	v             *view.View
-	portNum       int
-	mcpServer     *mcp.Server
-	logger        *slog.Logger
-	cancel        context.CancelFunc
-	mu            sync.RWMutex
-	k             pet.Keeper
+	cfgCh     <-chan config.Config
+	v         *view.View
+	portNum   int
+	mcpServer *mcp.Server
+	logger    *slog.Logger
+	cancel    context.CancelFunc
+	mu        sync.RWMutex
+	k         pet.Keeper
+	// start check
 	animToolNames []string
 	activePort    int      // port the HTTP listener is currently bound to
 	restartPort   chan int // receives a new port to restart the HTTP server on
+	// end check
 }
 
 func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Config, logger *slog.Logger, cancel context.CancelFunc) *server {
@@ -212,6 +214,7 @@ func (s *server) onConfigChange(cfg config.Config) {
 	if s.v != nil {
 		s.v.Show(anim)
 	}
+
 	if cfg.Port != 0 && cfg.Port != active {
 		select {
 		case s.restartPort <- cfg.Port:
