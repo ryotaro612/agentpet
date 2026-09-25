@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -12,40 +13,26 @@ import (
 func TestWatcherTerminatesOnCancel(t *testing.T) {
 	t.Parallel()
 
-	w, path, cancel := newWatcher(t)
-	called := make(chan struct{}, 1)
-	if err := w.Watch(func(Config) {
-		called <- struct{}{}
-	}); err != nil {
-		t.Fatal(err)
-	}
-
+	ch, _, cancel := newWatcher(t)
 	cancel()
-	time.Sleep(100 * time.Millisecond)
 
-	if err := os.WriteFile(path, []byte(minimalValidTOML), 0644); err != nil {
-		t.Fatal(err)
-	}
 	select {
-	case <-called:
-		t.Fatal("onChange was called after the context was cancelled")
-	case <-time.After(200 * time.Millisecond):
+	case cfg, ok := <-ch:
+		if ok {
+			t.Fatalf("expected closed channel, got config: %+v", cfg)
+		}
+		if !reflect.DeepEqual(cfg, Config{}) {
+			t.Errorf("a zero-value Config is received from a closed channel: got %+v, want %+v", cfg, Config{})
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("channel was not closed within timeout after cancellation")
 	}
 }
 
 func TestWatcherCallbackOnFileChange(t *testing.T) {
 	t.Parallel()
 
-	w, path, _ := newWatcher(t)
-	updated := make(chan Config, 1)
-	if err := w.Watch(func(c Config) {
-		select {
-		case updated <- c:
-		default:
-		}
-	}); err != nil {
-		t.Fatal(err)
-	}
+	ch, path, _ := newWatcher(t)
 
 	const modifiedTOML = `port = 9090
 
@@ -65,12 +52,12 @@ filepath = "run.png"
 	}
 
 	select {
-	case got := <-updated:
+	case got := <-ch:
 		if got.Port != 9090 {
 			t.Errorf("port: got %d, want 9090", got.Port)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("onChange was not called within timeout")
+		t.Fatal("config was not sent within timeout")
 	}
 }
 
@@ -101,15 +88,15 @@ func writeConfigFile(t *testing.T, content string) string {
 	return f.Name()
 }
 
-func newWatcher(t *testing.T) (*Watcher, string, context.CancelFunc) {
+func newWatcher(t *testing.T) (chan Config, string, context.CancelFunc) {
 	t.Helper()
 	path := writeConfigFile(t, minimalValidTOML)
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	cfg, err := LoadConfig(path)
-	if err != nil {
-		t.Fatal(err)
-	}
 	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
-	return NewConfigWatcher(ctx, path, cfg, logger), path, cancel
+	ch := make(chan Config, 1)
+	if _, err := NewConfigWatcher(ctx, path, ch, logger); err != nil {
+		t.Fatal(err)
+	}
+	return ch, path, cancel
 }

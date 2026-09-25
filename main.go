@@ -26,10 +26,13 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	watcher := config.NewConfigWatcher(ctx, args.ConfigFile, cfg, logger)
+	cfgCh := make(chan config.Config)
+	if _, err := config.NewConfigWatcher(ctx, args.ConfigFile, cfgCh, logger); err != nil {
+		logger.Warn("failed to start config watcher", "err", err)
+	}
 
 	v := view.New(logger)
-	s := internal.NewServer(watcher, v, cfg.Port, logger, cancel)
+	s := internal.NewServer(cfgCh, v, cfg.Port, cfg, logger, cancel)
 	go s.Run(ctx)
 	v.Run(ctx)
 }

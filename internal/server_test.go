@@ -23,9 +23,12 @@ func TestToolList(t *testing.T) {
 		t.Fatal(err)
 	}
 	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	watcher := config.NewConfigWatcher(ctx, "testdata/TestToolList.toml", cfg, logger)
+	cfgCh := make(chan config.Config)
+	if _, err := config.NewConfigWatcher(ctx, "testdata/TestToolList.toml", cfgCh, logger); err != nil {
+		t.Fatal(err)
+	}
 
-	s := NewServer(watcher, nil, 0, logger, cancel)
+	s := NewServer(cfgCh, nil, 0, cfg, logger, cancel)
 
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	go s.mcpServer.Run(ctx, serverTransport)

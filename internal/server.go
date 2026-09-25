@@ -18,17 +18,13 @@ import (
 	"github.com/ryotaro612/agentpet/internal/view"
 )
 
-type nameInput struct {
-	Name string `json:"name"`
-}
-
 type changePetInput struct {
 	Name      string `json:"name"`
 	Animation string `json:"animation"`
 }
 
 type server struct {
-	watcher       *config.Watcher
+	cfgCh         <-chan config.Config
 	v             *view.View
 	portNum       int
 	mcpServer     *mcp.Server
@@ -41,9 +37,9 @@ type server struct {
 	restartPort   chan int // receives a new port to restart the HTTP server on
 }
 
-func NewServer(w *config.Watcher, v *view.View, port int, logger *slog.Logger, cancel context.CancelFunc) *server {
+func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Config, logger *slog.Logger, cancel context.CancelFunc) *server {
 	s := &server{
-		watcher: w,
+		cfgCh:   cfgCh,
 		v:       v,
 		portNum: port,
 		mcpServer: mcp.NewServer(&mcp.Implementation{Name: "agentpet", Version: "v0.0.1"}, &mcp.ServerOptions{
@@ -53,7 +49,7 @@ func NewServer(w *config.Watcher, v *view.View, port int, logger *slog.Logger, c
 		}),
 		logger:      logger,
 		cancel:      cancel,
-		k:           pet.NewKeeper(w.Get()),
+		k:           pet.NewKeeper(cfg),
 		restartPort: make(chan int, 1),
 	}
 
@@ -126,18 +122,6 @@ func NewServer(w *config.Watcher, v *view.View, port int, logger *slog.Logger, c
 
 	s.registerTools()
 	return s
-}
-
-
-func buildEnumSchema(param, description string, values []string) json.RawMessage {
-	b, _ := json.Marshal(map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			param: map[string]any{"type": "string", "description": description, "enum": values},
-		},
-		"required": []string{param},
-	})
-	return json.RawMessage(b)
 }
 
 func buildChangePetSchema(petNames []string) json.RawMessage {
@@ -236,13 +220,22 @@ func (s *server) onConfigChange(cfg config.Config) {
 	}
 }
 
-
 func (s *server) Run(ctx context.Context) {
 	defer s.cancel()
 
-	if err := s.watcher.Watch(s.onConfigChange); err != nil {
-		s.logger.Warn("failed to start config watcher", "err", err)
-	}
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case cfg, ok := <-s.cfgCh:
+				if !ok {
+					return
+				}
+				s.onConfigChange(cfg)
+			}
+		}
+	}()
 
 	port, err := s.availablePort()
 	if err != nil {

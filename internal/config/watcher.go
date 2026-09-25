@@ -4,29 +4,25 @@ import (
 	"context"
 	"log/slog"
 	"path/filepath"
-	"sync/atomic"
 
 	"github.com/fsnotify/fsnotify"
 )
 
 type Watcher struct {
-	path    string
-	current atomic.Pointer[Config]
-	logger  *slog.Logger
-	ctx     context.Context
+	path   string
+	ch     chan<- Config
+	logger *slog.Logger
 }
 
-func NewConfigWatcher(ctx context.Context, path string, cfg Config, logger *slog.Logger) *Watcher {
-	w := &Watcher{path: path, logger: logger, ctx: ctx}
-	w.current.Store(&cfg)
-	return w
+func NewConfigWatcher(ctx context.Context, path string, ch chan<- Config, logger *slog.Logger) (Watcher, error) {
+	w := Watcher{path: path, ch: ch, logger: logger}
+	if err := w.start(ctx); err != nil {
+		return Watcher{}, err
+	}
+	return w, nil
 }
 
-func (w *Watcher) Get() Config {
-	return *w.current.Load()
-}
-
-func (w *Watcher) Watch(onChange func(Config)) error {
+func (w *Watcher) start(ctx context.Context) error {
 	fsw, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
@@ -41,10 +37,11 @@ func (w *Watcher) Watch(onChange func(Config)) error {
 	}
 	base := filepath.Base(w.path)
 	go func() {
+		defer close(w.ch)
 		defer fsw.Close()
 		for {
 			select {
-			case <-w.ctx.Done():
+			case <-ctx.Done():
 				return
 			case event, ok := <-fsw.Events:
 				if !ok {
@@ -61,8 +58,11 @@ func (w *Watcher) Watch(onChange func(Config)) error {
 					w.logger.Warn("config reload failed", "err", err)
 					continue
 				}
-				w.current.Store(&cfg)
-				onChange(cfg)
+				select {
+				case w.ch <- cfg:
+				case <-ctx.Done():
+					return
+				}
 			case err, ok := <-fsw.Errors:
 				if !ok {
 					return
