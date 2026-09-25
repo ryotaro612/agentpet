@@ -32,13 +32,10 @@ type server struct {
 	cancel    context.CancelFunc
 	mu        sync.RWMutex
 	k         pet.Keeper
-	// start check
-	restartPort chan int // receives a new port to restart the HTTP server on
-	// end check
 }
 
 func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Config, logger *slog.Logger, cancel context.CancelFunc) *server {
-	s := &server{
+	s := server{
 		cfgCh: cfgCh,
 		v:     v,
 		port:  port,
@@ -47,10 +44,9 @@ func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Co
 				Tools: &mcp.ToolCapabilities{ListChanged: true},
 			},
 		}),
-		logger:      logger,
-		cancel:      cancel,
-		k:           pet.NewKeeper(cfg),
-		restartPort: make(chan int, 1),
+		logger: logger,
+		cancel: cancel,
+		k:      pet.NewKeeper(cfg),
 	}
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -121,7 +117,7 @@ func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Co
 	})
 
 	s.registerTools()
-	return s
+	return &s
 }
 
 func buildChangePetSchema(petNames []string) json.RawMessage {
@@ -213,42 +209,14 @@ func (s *server) onConfigChange(cfg config.Config) {
 	s.k = pet.NewKeeper(cfg)
 	s.registerTools()
 	anim := s.k.CurrentAnimation()
-	active := s.port
 	s.mu.Unlock()
 	if s.v != nil {
 		s.v.Show(anim)
-	}
-
-	if cfg.Port != 0 && cfg.Port != active {
-		select {
-		case s.restartPort <- cfg.Port:
-		default:
-		}
 	}
 }
 
 func (s *server) Run(ctx context.Context) {
 	defer s.cancel()
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case cfg, ok := <-s.cfgCh:
-				if !ok {
-					return
-				}
-				s.onConfigChange(cfg)
-			}
-		}
-	}()
-
-	port, err := s.availablePort()
-	if err != nil {
-		s.logger.Error("failed to find available port", "err", err)
-		return
-	}
 
 	mux := http.NewServeMux()
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server { return s.mcpServer }, nil)
@@ -264,16 +232,13 @@ func (s *server) Run(ctx context.Context) {
 		s.v.Show(anim)
 	}
 
+outer:
 	for {
-		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+		ln, err := s.availablePort()
 		if err != nil {
-			s.logger.Error("failed to listen", "port", port, "err", err)
+			s.logger.Error("failed to listen", "err", err)
 			return
 		}
-
-		s.mu.Lock()
-		s.port = ln.Addr().(*net.TCPAddr).Port
-		s.mu.Unlock()
 
 		s.logger.Info("MCP server listening", "addr", ln.Addr().String())
 
@@ -286,31 +251,51 @@ func (s *server) Run(ctx context.Context) {
 			}
 		}()
 
-		select {
-		case <-ctx.Done():
-		case <-sigCh:
-			s.cancel()
-		case newPort := <-s.restartPort:
-			httpSrv.Shutdown(context.Background())
-			<-srvDone
-			port = newPort
-			s.logger.Info("MCP server restarting", "port", newPort)
-			continue
+		for {
+			select {
+			case <-ctx.Done():
+				httpSrv.Shutdown(context.Background())
+				<-srvDone
+				return
+			case <-sigCh:
+				s.cancel()
+				httpSrv.Shutdown(context.Background())
+				<-srvDone
+				return
+			case cfg, ok := <-s.cfgCh:
+				if !ok {
+					httpSrv.Shutdown(context.Background())
+					<-srvDone
+					return
+				}
+				s.mu.RLock()
+				activePort := s.port
+				s.mu.RUnlock()
+				s.onConfigChange(cfg)
+				if cfg.Port != 0 && cfg.Port != activePort {
+					httpSrv.Shutdown(context.Background())
+					<-srvDone
+					s.mu.Lock()
+					s.port = cfg.Port
+					s.mu.Unlock()
+					s.logger.Info("MCP server restarting", "port", cfg.Port)
+					continue outer
+				}
+			}
 		}
-		httpSrv.Shutdown(context.Background())
-		<-srvDone
-		return
 	}
 }
 
-func (s *server) availablePort() (int, error) {
-	if s.port != 0 {
-		return s.port, nil
-	}
-	ln, err := net.Listen("tcp", ":0")
+func (s *server) availablePort() (net.Listener, error) {
+	s.mu.RLock()
+	port := s.port
+	s.mu.RUnlock()
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	defer ln.Close()
-	return ln.Addr().(*net.TCPAddr).Port, nil
+	s.mu.Lock()
+	s.port = ln.Addr().(*net.TCPAddr).Port
+	s.mu.Unlock()
+	return ln, nil
 }
