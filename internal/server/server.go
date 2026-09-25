@@ -26,24 +26,22 @@ type changePetInput struct {
 type server struct {
 	cfgCh     <-chan config.Config
 	v         *view.View
-	portNum   int
+	port      int // configured port (0 = auto); updated to the bound port after Listen
 	mcpServer *mcp.Server
 	logger    *slog.Logger
 	cancel    context.CancelFunc
 	mu        sync.RWMutex
 	k         pet.Keeper
 	// start check
-	animToolNames []string
-	activePort    int      // port the HTTP listener is currently bound to
-	restartPort   chan int // receives a new port to restart the HTTP server on
+	restartPort chan int // receives a new port to restart the HTTP server on
 	// end check
 }
 
 func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Config, logger *slog.Logger, cancel context.CancelFunc) *server {
 	s := &server{
-		cfgCh:   cfgCh,
-		v:       v,
-		portNum: port,
+		cfgCh: cfgCh,
+		v:     v,
+		port:  port,
 		mcpServer: mcp.NewServer(&mcp.Implementation{Name: "agentpet", Version: "v0.0.1"}, &mcp.ServerOptions{
 			Capabilities: &mcp.ServerCapabilities{
 				Tools: &mcp.ToolCapabilities{ListChanged: true},
@@ -145,20 +143,26 @@ func buildChangePetSchema(petNames []string) json.RawMessage {
 	return json.RawMessage(b)
 }
 
+func (s *server) animToolNames() []string {
+	anims := s.k.Animations()
+	names := make([]string, len(anims))
+	for i, a := range anims {
+		names[i] = "play_" + a.Name
+	}
+	return names
+}
+
 // registerTools must be called with s.mu held for writing.
 func (s *server) registerTools() {
-	s.mcpServer.RemoveTools(append(s.animToolNames, "change_pet")...)
+	s.mcpServer.RemoveTools(append(s.animToolNames(), "change_pet")...)
 
-	anims := s.k.Animations()
-	s.animToolNames = make([]string, 0, len(anims))
-	for _, a := range anims {
-		toolName := "anim_" + a.Name
+	for _, a := range s.k.Animations() {
+		toolName := "play_" + a.Name
 		desc := a.Description
 		if desc == "" {
 			desc = "Play the " + a.Name + " animation"
 		}
 		animName := a.Name
-		s.animToolNames = append(s.animToolNames, toolName)
 		mcp.AddTool(s.mcpServer, &mcp.Tool{
 			Name:        toolName,
 			Description: desc,
@@ -209,7 +213,7 @@ func (s *server) onConfigChange(cfg config.Config) {
 	s.k = pet.NewKeeper(cfg)
 	s.registerTools()
 	anim := s.k.CurrentAnimation()
-	active := s.activePort
+	active := s.port
 	s.mu.Unlock()
 	if s.v != nil {
 		s.v.Show(anim)
@@ -250,15 +254,8 @@ func (s *server) Run(ctx context.Context) {
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server { return s.mcpServer }, nil)
 	mux.Handle("/", mcpHandler)
 
-	go func() {
-		ch := make(chan os.Signal, 1)
-		signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
-		select {
-		case <-ch:
-			s.cancel()
-		case <-ctx.Done():
-		}
-	}()
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
 	if s.v != nil {
 		s.mu.RLock()
@@ -275,7 +272,7 @@ func (s *server) Run(ctx context.Context) {
 		}
 
 		s.mu.Lock()
-		s.activePort = ln.Addr().(*net.TCPAddr).Port
+		s.port = ln.Addr().(*net.TCPAddr).Port
 		s.mu.Unlock()
 
 		s.logger.Info("MCP server listening", "addr", ln.Addr().String())
@@ -291,21 +288,24 @@ func (s *server) Run(ctx context.Context) {
 
 		select {
 		case <-ctx.Done():
-			httpSrv.Shutdown(context.Background())
-			<-srvDone
-			return
+		case <-sigCh:
+			s.cancel()
 		case newPort := <-s.restartPort:
 			httpSrv.Shutdown(context.Background())
 			<-srvDone
 			port = newPort
 			s.logger.Info("MCP server restarting", "port", newPort)
+			continue
 		}
+		httpSrv.Shutdown(context.Background())
+		<-srvDone
+		return
 	}
 }
 
 func (s *server) availablePort() (int, error) {
-	if s.portNum != 0 {
-		return s.portNum, nil
+	if s.port != 0 {
+		return s.port, nil
 	}
 	ln, err := net.Listen("tcp", ":0")
 	if err != nil {
