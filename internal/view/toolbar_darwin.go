@@ -14,10 +14,36 @@ package view
 //     w.opaque = NO;
 //     w.backgroundColor = [NSColor clearColor];
 //     w.level = NSFloatingWindowLevel;
+//     w.hidesOnDeactivate = NO;
 //     if ([w.contentView isKindOfClass:[WKWebView class]]) {
 //         WKWebView* webView = (WKWebView*)w.contentView;
 //         [webView setValue:@NO forKey:@"drawsBackground"];
 //     }
+// }
+//
+// // preventHide uses two layers:
+// //   1. Swizzle NSApplication.hide: to a no-op (covers Cmd+H pressed within the app).
+// //   2. Observe NSApplicationDidHideNotification and immediately call unhide: (covers
+// //      "Hide Others" from another app, which sends an Apple Event that may bypass
+// //      the swizzle).
+// void preventHide(void* winPtr) {
+//     NSWindow* w = (__bridge NSWindow*)winPtr;
+//     Class cls = [NSApplication class];
+//     SEL sel = @selector(hide:);
+//     Method m = class_getInstanceMethod(cls, sel);
+//     if (m) {
+//         method_setImplementation(m, imp_implementationWithBlock(
+//             ^(id __unused self, id __unused sender) {}
+//         ));
+//     }
+//     [[NSNotificationCenter defaultCenter]
+//         addObserverForName:NSApplicationDidHideNotification
+//         object:NSApp
+//         queue:[NSOperationQueue mainQueue]
+//         usingBlock:^(NSNotification* __unused n) {
+//             [NSApp unhide:nil];
+//             [w makeKeyAndOrderFront:nil];
+//         }];
 // }
 //
 // // preventTerminateOnHide replaces the webview library's hardcoded YES return
@@ -46,6 +72,7 @@ package view
 //     w.opaque = NO;
 //     w.backgroundColor = [NSColor clearColor];
 //     w.level = NSFloatingWindowLevel;
+//     w.hidesOnDeactivate = NO;
 //     if ([w.contentView isKindOfClass:[WKWebView class]]) {
 //         WKWebView* webView = (WKWebView*)w.contentView;
 //         [webView setValue:@NO forKey:@"drawsBackground"];
@@ -72,6 +99,7 @@ package view
 //     w.opaque = NO;
 //     w.backgroundColor = [NSColor clearColor];
 //     w.level = NSFloatingWindowLevel;
+//     w.hidesOnDeactivate = NO;
 //     if ([w.contentView isKindOfClass:[WKWebView class]]) {
 //         WKWebView* webView = (WKWebView*)w.contentView;
 //         [webView setValue:@NO forKey:@"drawsBackground"];
@@ -111,6 +139,10 @@ func SetupWindow(window unsafe.Pointer) {
 
 func PreventTerminateOnHide() {
 	C.preventTerminateOnHide()
+}
+
+func PreventHide(window unsafe.Pointer) {
+	C.preventHide(window)
 }
 
 func SetWindowSize(window unsafe.Pointer, width, height int) {

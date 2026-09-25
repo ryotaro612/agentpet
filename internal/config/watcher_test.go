@@ -9,19 +9,6 @@ import (
 	"time"
 )
 
-func newWatcher(t *testing.T) (*Watcher, string, context.CancelFunc) {
-	t.Helper()
-	path := writeConfigFile(t, minimalValidTOML)
-	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	cfg, err := LoadConfig(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx, cancel := context.WithCancel(t.Context())
-	t.Cleanup(cancel)
-	return NewConfigWatcher(ctx, path, cfg, logger), path, cancel
-}
-
 func TestWatcherTerminatesOnCancel(t *testing.T) {
 	t.Parallel()
 
@@ -112,4 +99,17 @@ func writeConfigFile(t *testing.T, content string) string {
 		t.Fatal(err)
 	}
 	return f.Name()
+}
+
+func newWatcher(t *testing.T) (*Watcher, string, context.CancelFunc) {
+	t.Helper()
+	path := writeConfigFile(t, minimalValidTOML)
+	logger := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	t.Cleanup(cancel)
+	return NewConfigWatcher(ctx, path, cfg, logger), path, cancel
 }
