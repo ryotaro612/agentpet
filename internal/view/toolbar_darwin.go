@@ -121,6 +121,21 @@ package view
 //     [w setFrameOrigin:o];
 // }
 //
+// // setupQuit registers a local key-event monitor that intercepts Cmd+Q before
+// // WKWebView can swallow it, then calls [NSApp terminate:nil] for a clean exit.
+// void setupQuit(void) {
+//     [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown
+//                                           handler:^NSEvent*(NSEvent* event) {
+//         BOOL cmdQ = (event.modifierFlags & NSEventModifierFlagCommand) &&
+//                     [[event charactersIgnoringModifiers] isEqualToString:@"q"];
+//         if (cmdQ) {
+//             [NSApp terminate:nil];
+//             return nil;
+//         }
+//         return event;
+//     }];
+// }
+//
 // void showWindowNative(void* ptr) {
 //     NSWindow* w = (__bridge NSWindow*)ptr;
 //     [w makeKeyAndOrderFront:nil];
@@ -155,6 +170,10 @@ func ResizeWindowKeepingPosition(window unsafe.Pointer, width, height int) {
 
 func MoveWindow(window unsafe.Pointer, dx, dy float64) {
 	C.moveWindow(window, C.double(dx), C.double(dy))
+}
+
+func SetupQuit() {
+	C.setupQuit()
 }
 
 func ShowWindow(window unsafe.Pointer) {

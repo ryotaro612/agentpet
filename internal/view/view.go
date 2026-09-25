@@ -59,6 +59,7 @@ func New(logger *slog.Logger) *View {
 	win := w.Window()
 	SetupWindow(win)
 	PreventHide(win)
+	SetupQuit()
 
 	w.Bind("moveWindow", func(dx, dy float64) {
 		MoveWindow(win, dx, dy)
