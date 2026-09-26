@@ -12,6 +12,10 @@ type mcpTool struct {
 	handler mcp.ToolHandlerFor[struct{}, any]
 }
 
+func (t mcpTool) toolName() string {
+	return t.tool.Name
+}
+
 func showWindowTool(v *view.View) mcpTool {
 	return newWindowTool("show_window", "Show the pet window", v.ShowWindow, "Window is now visible")
 }

@@ -95,8 +95,8 @@ func (s *server) animToolNames(petName string) []string {
 
 // registerTools must be called with s.mu held for writing.
 func (s *server) registerTools(petName string) {
-	s.mcpServer.RemoveTools(append(s.animToolNames(petName), "change_pet", "list_pets")...)
 	lp := listPetsTool(s.k, s.v)
+	s.mcpServer.RemoveTools(append(s.animToolNames(petName), "change_pet", lp.toolName())...)
 	mcp.AddTool(s.mcpServer, &lp.tool, lp.handler)
 
 	for _, a := range s.k.Animations(petName) {
