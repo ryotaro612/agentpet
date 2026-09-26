@@ -23,32 +23,25 @@ type changePetInput struct {
 	Animation string `json:"animation"`
 }
 
-// serverState holds the fields that are mutated after construction.
-// Keeping them behind a pointer lets server be returned by value while
-// closures and callers share the same underlying state.
-type serverState struct {
-	mu   sync.RWMutex
-	k    pet.Keeper
-	port int // configured port (0 = auto); updated to the bound port after Listen
-}
-
 type server struct {
 	cfgCh     <-chan config.Config
 	v         *view.View
-	st        *serverState
+	port      int // configured port (0 = auto); updated to the bound port after Listen
 	mcpServer *mcp.Server
 	logger    *slog.Logger
 	cancel    context.CancelFunc
+	mu        sync.RWMutex
+	k         pet.Keeper
 }
 
-func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Config, logger *slog.Logger, cancel context.CancelFunc) (server, error) {
+func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Config, logger *slog.Logger, cancel context.CancelFunc) (*server, error) {
 	if v == nil {
-		return server{}, fmt.Errorf("server: viewer is required")
+		return nil, fmt.Errorf("server: viewer is required")
 	}
 	s := server{
 		cfgCh: cfgCh,
 		v:     v,
-		st:    &serverState{port: port, k: pet.NewKeeper(cfg)},
+		port:  port,
 		mcpServer: mcp.NewServer(&mcp.Implementation{Name: "agentpet", Version: "v0.0.1"}, &mcp.ServerOptions{
 			Capabilities: &mcp.ServerCapabilities{
 				Tools: &mcp.ToolCapabilities{ListChanged: true},
@@ -56,6 +49,7 @@ func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Co
 		}),
 		logger: logger,
 		cancel: cancel,
+		k:      pet.NewKeeper(cfg),
 	}
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
@@ -78,11 +72,11 @@ func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Co
 		Name:        "list_pets",
 		Description: "List all available pets and their animations, indicating which are currently active",
 	}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-		s.st.mu.RLock()
-		allPets := s.st.k.AllPets()
-		currentPet := s.st.k.CurrentPetName()
-		currentAnim := s.st.k.CurrentAnimation().Name
-		s.st.mu.RUnlock()
+		s.mu.RLock()
+		allPets := s.k.AllPets()
+		currentPet := s.k.CurrentPetName()
+		currentAnim := s.k.CurrentAnimation().Name
+		s.mu.RUnlock()
 
 		type activeEntry struct {
 			Pet       string `json:"pet"`
@@ -125,7 +119,7 @@ func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Co
 	})
 
 	s.registerTools()
-	return s, nil
+	return &s, nil
 }
 
 func buildChangePetSchema(petNames []string) json.RawMessage {
@@ -148,7 +142,7 @@ func buildChangePetSchema(petNames []string) json.RawMessage {
 }
 
 func (s *server) animToolNames() []string {
-	anims := s.st.k.Animations()
+	anims := s.k.Animations()
 	names := make([]string, len(anims))
 	for i, a := range anims {
 		names[i] = "play_" + a.Name
@@ -156,11 +150,11 @@ func (s *server) animToolNames() []string {
 	return names
 }
 
-// registerTools must be called with s.st.mu held for writing.
+// registerTools must be called with s.mu held for writing.
 func (s *server) registerTools() {
 	s.mcpServer.RemoveTools(append(s.animToolNames(), "change_pet")...)
 
-	for _, a := range s.st.k.Animations() {
+	for _, a := range s.k.Animations() {
 		toolName := "play_" + a.Name
 		desc := a.Description
 		if desc == "" {
@@ -171,13 +165,13 @@ func (s *server) registerTools() {
 			Name:        toolName,
 			Description: desc,
 		}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-			s.st.mu.Lock()
-			newK, err := s.st.k.PlayAnimation(animName)
+			s.mu.Lock()
+			newK, err := s.k.PlayAnimation(animName)
 			if err == nil {
-				s.st.k = newK
+				s.k = newK
 			}
-			anim := s.st.k.CurrentAnimation()
-			s.st.mu.Unlock()
+			anim := s.k.CurrentAnimation()
+			s.mu.Unlock()
 			if err != nil {
 				return nil, nil, err
 			}
@@ -186,22 +180,22 @@ func (s *server) registerTools() {
 		})
 	}
 
-	if otherPets := s.st.k.OtherPetNames(); len(otherPets) > 0 {
+	if otherPets := s.k.OtherPetNames(); len(otherPets) > 0 {
 		mcp.AddTool(s.mcpServer, &mcp.Tool{
 			Name:        "change_pet",
 			Description: "Switch the active pet",
 			InputSchema: buildChangePetSchema(otherPets),
 		}, func(_ context.Context, _ *mcp.CallToolRequest, input changePetInput) (*mcp.CallToolResult, any, error) {
-			s.st.mu.Lock()
-			newK, err := s.st.k.ChangePet(input.Name, input.Animation)
+			s.mu.Lock()
+			newK, err := s.k.ChangePet(input.Name, input.Animation)
 			if err != nil {
-				s.st.mu.Unlock()
+				s.mu.Unlock()
 				return nil, nil, err
 			}
-			s.st.k = newK
+			s.k = newK
 			s.registerTools()
-			anim := s.st.k.CurrentAnimation()
-			s.st.mu.Unlock()
+			anim := s.k.CurrentAnimation()
+			s.mu.Unlock()
 			s.v.Show(anim)
 			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Switched to " + input.Name}}}, nil, nil
 		})
@@ -209,11 +203,11 @@ func (s *server) registerTools() {
 }
 
 func (s *server) onConfigChange(cfg config.Config) {
-	s.st.mu.Lock()
-	s.st.k = pet.NewKeeper(cfg)
+	s.mu.Lock()
+	s.k = pet.NewKeeper(cfg)
 	s.registerTools()
-	anim := s.st.k.CurrentAnimation()
-	s.st.mu.Unlock()
+	anim := s.k.CurrentAnimation()
+	s.mu.Unlock()
 	s.v.Show(anim)
 }
 
@@ -227,9 +221,9 @@ func (s *server) Run(ctx context.Context) {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
-	s.st.mu.RLock()
-	anim := s.st.k.CurrentAnimation()
-	s.st.mu.RUnlock()
+	s.mu.RLock()
+	anim := s.k.CurrentAnimation()
+	s.mu.RUnlock()
 	s.v.Show(anim)
 
 outer:
@@ -268,16 +262,16 @@ outer:
 					<-srvDone
 					return
 				}
-				s.st.mu.RLock()
-				activePort := s.st.port
-				s.st.mu.RUnlock()
+				s.mu.RLock()
+				activePort := s.port
+				s.mu.RUnlock()
 				s.onConfigChange(cfg)
 				if cfg.Port != 0 && cfg.Port != activePort {
 					httpSrv.Shutdown(context.Background())
 					<-srvDone
-					s.st.mu.Lock()
-					s.st.port = cfg.Port
-					s.st.mu.Unlock()
+					s.mu.Lock()
+					s.port = cfg.Port
+					s.mu.Unlock()
 					s.logger.Info("MCP server restarting", "port", cfg.Port)
 					continue outer
 				}
@@ -287,15 +281,15 @@ outer:
 }
 
 func (s *server) availablePort() (net.Listener, error) {
-	s.st.mu.RLock()
-	port := s.st.port
-	s.st.mu.RUnlock()
+	s.mu.RLock()
+	port := s.port
+	s.mu.RUnlock()
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return nil, err
 	}
-	s.st.mu.Lock()
-	s.st.port = ln.Addr().(*net.TCPAddr).Port
-	s.st.mu.Unlock()
+	s.mu.Lock()
+	s.port = ln.Addr().(*net.TCPAddr).Port
+	s.mu.Unlock()
 	return ln, nil
 }
