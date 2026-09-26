@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ryotaro612/agentpet/internal/config"
+	"github.com/ryotaro612/agentpet/internal/view"
 )
 
 func TestToolList(t *testing.T) {
@@ -28,7 +29,10 @@ func TestToolList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := NewServer(cfgCh, nil, 0, cfg, logger, cancel)
+	s, err := NewServer(cfgCh, view.Noop(), 0, cfg, logger, cancel)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 	go s.mcpServer.Run(ctx, serverTransport)

@@ -84,14 +84,26 @@ func (v *View) Show(anim pet.Animation) {
 
 // ShowWindow brings the pet window to the front.
 func (v *View) ShowWindow() {
+	if v.w == nil {
+		return
+	}
 	win := v.w.Window()
 	v.w.Dispatch(func() { ShowWindow(win) })
 }
 
 // HideWindow hides the pet window.
 func (v *View) HideWindow() {
+	if v.w == nil {
+		return
+	}
 	win := v.w.Window()
 	v.w.Dispatch(func() { HideWindow(win) })
+}
+
+// Noop returns a View that accepts method calls without doing anything.
+// Intended for use in tests.
+func Noop() *View {
+	return &View{animCh: make(chan pet.Animation, 1)}
 }
 
 // Run starts the webview event loop. It blocks until ctx is cancelled or the

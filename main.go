@@ -33,7 +33,11 @@ func main() {
 	}
 
 	v := view.New(logger)
-	s := server.NewServer(cfgCh, v, cfg.Port, cfg, logger, cancel)
+	s, err := server.NewServer(cfgCh, v, cfg.Port, cfg, logger, cancel)
+	if err != nil {
+		logger.Error("failed to create server", "err", err)
+		os.Exit(1)
+	}
 	go s.Run(ctx)
 	v.Run(ctx)
 }

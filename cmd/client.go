@@ -82,7 +82,7 @@ func main() {
 func cmdAnimation(ctx context.Context, session *mcp.ClientSession, args []string, verbose bool) error {
 	var toolName string
 	if len(args) > 0 {
-		toolName = "anim_" + args[0]
+		toolName = "play_" + args[0]
 	} else {
 		tools, err := session.ListTools(ctx, &mcp.ListToolsParams{})
 		if err != nil {
@@ -90,7 +90,7 @@ func cmdAnimation(ctx context.Context, session *mcp.ClientSession, args []string
 		}
 		var animTools []string
 		for _, t := range tools.Tools {
-			if strings.HasPrefix(t.Name, "anim_") {
+			if strings.HasPrefix(t.Name, "play_") {
 				animTools = append(animTools, t.Name)
 			}
 		}
@@ -138,17 +138,10 @@ func currentAnimToolName(ctx context.Context, session *mcp.ClientSession) string
 	if json.Unmarshal([]byte(text.Text), &resp) != nil {
 		return ""
 	}
-	for _, p := range resp.Pets {
-		if !p.Active {
-			continue
-		}
-		for _, a := range p.Animations {
-			if a.Active {
-				return "anim_" + a.Name
-			}
-		}
+	if resp.Active.Animation == "" {
+		return ""
 	}
-	return ""
+	return "play_" + resp.Active.Animation
 }
 
 func cmdPet(ctx context.Context, session *mcp.ClientSession, args []string, verbose bool) error {
@@ -175,13 +168,16 @@ func cmdPet(ctx context.Context, session *mcp.ClientSession, args []string, verb
 }
 
 type petsResponse struct {
+	Active struct {
+		Pet       string `json:"pet"`
+		Animation string `json:"animation"`
+	} `json:"active"`
 	Pets []struct {
-		Name       string `json:"name"`
-		Active     bool   `json:"active"`
-		Animations []struct {
-			Name        string `json:"name"`
-			Description string `json:"description"`
-			Active      bool   `json:"active"`
+		Name        string  `json:"name"`
+		Description *string `json:"description"`
+		Animations  []struct {
+			Name        string  `json:"name"`
+			Description *string `json:"description"`
 		} `json:"animations"`
 	} `json:"pets"`
 }
@@ -208,18 +204,18 @@ func cmdPets(ctx context.Context, session *mcp.ClientSession, verbose bool) erro
 	}
 	for _, p := range resp.Pets {
 		active := ""
-		if p.Active {
+		if p.Name == resp.Active.Pet {
 			active = " (active)"
 		}
 		fmt.Printf("%s%s\n", p.Name, active)
 		for _, a := range p.Animations {
 			animActive := ""
-			if a.Active {
+			if p.Name == resp.Active.Pet && a.Name == resp.Active.Animation {
 				animActive = " *"
 			}
 			desc := ""
-			if a.Description != "" {
-				desc = "  — " + a.Description
+			if a.Description != nil {
+				desc = "  — " + *a.Description
 			}
 			fmt.Printf("  %s%s%s\n", a.Name, animActive, desc)
 		}
