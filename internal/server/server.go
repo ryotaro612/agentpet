@@ -60,7 +60,7 @@ func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Co
 	mcp.AddTool(s.mcpServer, &hide.tool, hide.handler)
 	petName := k.DefaultPet()
 	anim, _ := k.DefaultAnim(petName)
-	s.registerTools(petName)
+	s.registerTools(petName, nil)
 	s.v.Show(petName, anim)
 	return &s, nil
 }
@@ -94,9 +94,9 @@ func (s *server) animToolNames(petName string) []string {
 }
 
 // registerTools must be called with s.mu held for writing.
-func (s *server) registerTools(petName string) {
+func (s *server) registerTools(petName string, oldAnimTools []string) {
 	lp := listPetsTool(s.k, s.v)
-	s.mcpServer.RemoveTools(append(s.animToolNames(petName), "change_pet", lp.toolName())...)
+	s.mcpServer.RemoveTools(append(oldAnimTools, "change_pet", lp.toolName())...)
 	mcp.AddTool(s.mcpServer, &lp.tool, lp.handler)
 
 	for _, a := range s.k.Animations(petName) {
@@ -137,7 +137,9 @@ func (s *server) registerTools(petName string) {
 				return nil, nil, err
 			}
 			s.mu.Lock()
-			s.registerTools(input.Name)
+			currentPet, _ := s.v.Current()
+			oldAnimTools := s.animToolNames(currentPet)
+			s.registerTools(input.Name, oldAnimTools)
 			s.mu.Unlock()
 			s.v.Show(input.Name, anim)
 			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Switched to " + input.Name}}}, nil, nil
@@ -150,8 +152,10 @@ func (s *server) onConfigChange(cfg config.Config) {
 	petName := k.DefaultPet()
 	anim, _ := k.DefaultAnim(petName)
 	s.mu.Lock()
+	currentPet, _ := s.v.Current()
+	oldAnimTools := s.animToolNames(currentPet)
 	s.k = k
-	s.registerTools(petName)
+	s.registerTools(petName, oldAnimTools)
 	s.mu.Unlock()
 	s.v.Show(petName, anim)
 }
