@@ -122,7 +122,7 @@ func cmdAnimation(ctx context.Context, session *mcp.ClientSession, args []string
 	return nil
 }
 
-// currentAnimToolName returns the "anim_<name>" tool name of the currently
+// currentAnimToolName returns the "play_<name>" tool name of the currently
 // active animation by calling list_pets. Returns "" on any error so the caller
 // can fall back gracefully.
 func currentAnimToolName(ctx context.Context, session *mcp.ClientSession) string {

@@ -11,6 +11,8 @@ GO_SRCS  := main.go $(shell find internal -name '*.go')
 CMD_SRCS := $(wildcard cmd/*.go)
 
 ##@ Build
+all: petowner app ## Build both the petowner client and the app bundle.
+
 build: $(BINARY) ## Build the agentpet binary.
 
 $(BINARY): $(GO_SRCS) | dist
@@ -58,4 +60,4 @@ help: ## Display this help.
 
 .DEFAULT_GOAL := help
 
-.PHONY: build petowner app test clean help dist
+.PHONY: all build petowner app test clean help dist

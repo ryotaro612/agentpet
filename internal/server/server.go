@@ -36,7 +36,7 @@ type server struct {
 
 func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Config, logger *slog.Logger, cancel context.CancelFunc) (*server, error) {
 	if v == nil {
-		return nil, fmt.Errorf("server: viewer is required")
+		return nil, fmt.Errorf("server: view is required")
 	}
 	s := server{
 		cfgCh: cfgCh,
@@ -52,21 +52,10 @@ func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Co
 		k:      pet.NewKeeper(cfg),
 	}
 
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "show_window",
-		Description: "Show the pet window",
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-		s.v.ShowWindow()
-		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Window is now visible"}}}, nil, nil
-	})
-
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "hide_window",
-		Description: "Hide the pet window",
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-		s.v.HideWindow()
-		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Window is now hidden"}}}, nil, nil
-	})
+	show := showWindowTool(s.v)
+	mcp.AddTool(s.mcpServer, &show.tool, show.handler)
+	hide := hideWindowTool(s.v)
+	mcp.AddTool(s.mcpServer, &hide.tool, hide.handler)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "list_pets",
