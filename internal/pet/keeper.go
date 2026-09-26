@@ -7,51 +7,72 @@ import (
 )
 
 type Keeper struct {
-	pets       map[string][]Animation
-	currentPet string
-	current    Animation
+	pets             map[string][]Animation
+	pet              string
+	defaultAnimations map[string]string
 }
 
 func NewKeeper(cfg config.Config) Keeper {
-	k := Keeper{pets: buildPetsMap(cfg)}
+	k := Keeper{
+		pets:             buildPetsMap(cfg),
+		defaultAnimations: make(map[string]string),
+	}
 	if _, ok := k.pets[cfg.Pet]; ok {
-		k.currentPet = cfg.Pet
+		k.pet = cfg.Pet
 	} else {
 		for name := range k.pets {
-			k.currentPet = name
+			k.pet = name
 			break
 		}
 	}
-	if anims := k.pets[k.currentPet]; len(anims) > 0 {
-		k.current = anims[0]
+	for petName, anims := range k.pets {
+		if len(anims) > 0 {
+			k.defaultAnimations[petName] = anims[0].Name
+		}
 	}
 	return k
 }
 
-func (k Keeper) PlayAnimation(name string) (Keeper, error) {
-	anims, ok := k.pets[k.currentPet]
+func (k Keeper) DefaultPet() string {
+	return k.pet
+}
+
+func (k Keeper) DefaultAnim(petName string) (Animation, bool) {
+	animName, ok := k.defaultAnimations[petName]
 	if !ok {
-		return k, fmt.Errorf("current pet %q not found", k.currentPet)
+		return Animation{}, false
+	}
+	for _, a := range k.pets[petName] {
+		if a.Name == animName {
+			return a, true
+		}
+	}
+	return Animation{}, false
+}
+
+func (k Keeper) PlayAnimation(currentPet, name string) (Animation, error) {
+	anims, ok := k.pets[currentPet]
+	if !ok {
+		return Animation{}, fmt.Errorf("current pet %q not found", currentPet)
 	}
 	for _, a := range anims {
 		if a.Name != name {
 			continue
 		}
 		if err := a.live(); err != nil {
-			return k, fmt.Errorf("animation %q unavailable: %w", name, err)
+			return Animation{}, fmt.Errorf("animation %q unavailable: %w", name, err)
 		}
-		k.current = a
-		return k, nil
+		return a, nil
 	}
-	return k, fmt.Errorf("animation %q not found for pet %q", name, k.currentPet)
+	return Animation{}, fmt.Errorf("animation %q not found for pet %q", name, currentPet)
 }
 
 // ChangePet switches to petName. If animName is non-empty the named animation
 // is activated; otherwise the first live animation is used.
-func (k Keeper) ChangePet(petName, animName string) (Keeper, error) {
+func (k Keeper) ChangePet(petName, animName string) (Animation, error) {
 	anims, ok := k.pets[petName]
 	if !ok {
-		return k, fmt.Errorf("pet %q not found", petName)
+		return Animation{}, fmt.Errorf("pet %q not found", petName)
 	}
 	if animName != "" {
 		for _, a := range anims {
@@ -59,31 +80,19 @@ func (k Keeper) ChangePet(petName, animName string) (Keeper, error) {
 				continue
 			}
 			if err := a.live(); err != nil {
-				return k, fmt.Errorf("animation %q unavailable: %w", animName, err)
+				return Animation{}, fmt.Errorf("animation %q unavailable: %w", animName, err)
 			}
-			k.currentPet = petName
-			k.current = a
-			return k, nil
+			return a, nil
 		}
-		return k, fmt.Errorf("animation %q not found for pet %q", animName, petName)
+		return Animation{}, fmt.Errorf("animation %q not found for pet %q", animName, petName)
 	}
 	for _, a := range anims {
 		if a.live() != nil {
 			continue
 		}
-		k.currentPet = petName
-		k.current = a
-		return k, nil
+		return a, nil
 	}
-	return k, fmt.Errorf("pet %q has no available animations", petName)
-}
-
-func (k Keeper) CurrentAnimation() Animation {
-	return k.current
-}
-
-func (k Keeper) CurrentPetName() string {
-	return k.currentPet
+	return Animation{}, fmt.Errorf("pet %q has no available animations", petName)
 }
 
 type PetInfo struct {
@@ -99,14 +108,14 @@ func (k Keeper) AllPets() []PetInfo {
 	return infos
 }
 
-func (k Keeper) Animations() []Animation {
-	return k.pets[k.currentPet]
+func (k Keeper) Animations(petName string) []Animation {
+	return k.pets[petName]
 }
 
-func (k Keeper) OtherPetNames() []string {
+func (k Keeper) OtherPetNames(currentPet string) []string {
 	others := make([]string, 0, len(k.pets)-1)
 	for name := range k.pets {
-		if name != k.currentPet {
+		if name != currentPet {
 			others = append(others, name)
 		}
 	}

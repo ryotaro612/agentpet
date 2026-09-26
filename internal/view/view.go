@@ -26,7 +26,10 @@ type View struct {
 	htmlPath string
 	// shown is set after the first animation is displayed and is accessed only
 	// from Dispatch callbacks, which run on the webview main thread.
-	shown bool
+	shown       bool
+	stateMu     sync.RWMutex
+	currentPet  string
+	currentAnim string
 }
 
 func New(logger *slog.Logger) *View {
@@ -74,12 +77,24 @@ func New(logger *slog.Logger) *View {
 	return v
 }
 
-// Show queues an animation for display, dropping the previous one if unread.
-func (v *View) Show(anim pet.Animation) {
+// Show records the current pet and animation, then queues the animation for
+// display, dropping the previous one if unread.
+func (v *View) Show(petName string, anim pet.Animation) {
+	v.stateMu.Lock()
+	v.currentPet = petName
+	v.currentAnim = anim.Name
+	v.stateMu.Unlock()
 	select {
 	case v.animCh <- anim:
 	default:
 	}
+}
+
+// Current returns the pet name and animation name that were most recently shown.
+func (v *View) Current() (petName, animName string) {
+	v.stateMu.RLock()
+	defer v.stateMu.RUnlock()
+	return v.currentPet, v.currentAnim
 }
 
 // ShowWindow brings the pet window to the front.

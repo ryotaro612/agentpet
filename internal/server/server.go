@@ -38,6 +38,8 @@ func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Co
 	if v == nil {
 		return nil, fmt.Errorf("server: view is required")
 	}
+	k := pet.NewKeeper(cfg)
+
 	s := server{
 		cfgCh: cfgCh,
 		v:     v,
@@ -49,65 +51,17 @@ func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Co
 		}),
 		logger: logger,
 		cancel: cancel,
-		k:      pet.NewKeeper(cfg),
+		k:      k,
 	}
 
 	show := showWindowTool(s.v)
 	mcp.AddTool(s.mcpServer, &show.tool, show.handler)
 	hide := hideWindowTool(s.v)
 	mcp.AddTool(s.mcpServer, &hide.tool, hide.handler)
-
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "list_pets",
-		Description: "List all available pets and their animations, indicating which are currently active",
-	}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-		s.mu.RLock()
-		allPets := s.k.AllPets()
-		currentPet := s.k.CurrentPetName()
-		currentAnim := s.k.CurrentAnimation().Name
-		s.mu.RUnlock()
-
-		type activeEntry struct {
-			Pet       string `json:"pet"`
-			Animation string `json:"animation"`
-		}
-		type animEntry struct {
-			Name        string  `json:"name"`
-			Description *string `json:"description"`
-		}
-		type petEntry struct {
-			Name        string      `json:"name"`
-			Description *string     `json:"description"`
-			Animations  []animEntry `json:"animations"`
-		}
-		type response struct {
-			Active activeEntry `json:"active"`
-			Pets   []petEntry  `json:"pets"`
-		}
-
-		pets := make([]petEntry, 0, len(allPets))
-		for _, p := range allPets {
-			anims := make([]animEntry, 0, len(p.Animations))
-			for _, a := range p.Animations {
-				var desc *string
-				if a.Description != "" {
-					desc = &a.Description
-				}
-				anims = append(anims, animEntry{Name: a.Name, Description: desc})
-			}
-			pets = append(pets, petEntry{Name: p.Name, Animations: anims})
-		}
-		b, err := json.Marshal(response{
-			Active: activeEntry{Pet: currentPet, Animation: currentAnim},
-			Pets:   pets,
-		})
-		if err != nil {
-			return nil, nil, err
-		}
-		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: string(b)}}}, nil, nil
-	})
-
-	s.registerTools()
+	petName := k.DefaultPet()
+	anim, _ := k.DefaultAnim(petName)
+	s.registerTools(petName)
+	s.v.Show(petName, anim)
 	return &s, nil
 }
 
@@ -130,8 +84,8 @@ func buildChangePetSchema(petNames []string) json.RawMessage {
 	return json.RawMessage(b)
 }
 
-func (s *server) animToolNames() []string {
-	anims := s.k.Animations()
+func (s *server) animToolNames(petName string) []string {
+	anims := s.k.Animations(petName)
 	names := make([]string, len(anims))
 	for i, a := range anims {
 		names[i] = "play_" + a.Name
@@ -140,10 +94,12 @@ func (s *server) animToolNames() []string {
 }
 
 // registerTools must be called with s.mu held for writing.
-func (s *server) registerTools() {
-	s.mcpServer.RemoveTools(append(s.animToolNames(), "change_pet")...)
+func (s *server) registerTools(petName string) {
+	s.mcpServer.RemoveTools(append(s.animToolNames(petName), "change_pet", "list_pets")...)
+	lp := listPetsTool(s.k, s.v)
+	mcp.AddTool(s.mcpServer, &lp.tool, lp.handler)
 
-	for _, a := range s.k.Animations() {
+	for _, a := range s.k.Animations(petName) {
 		toolName := "play_" + a.Name
 		desc := a.Description
 		if desc == "" {
@@ -154,50 +110,50 @@ func (s *server) registerTools() {
 			Name:        toolName,
 			Description: desc,
 		}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-			s.mu.Lock()
-			newK, err := s.k.PlayAnimation(animName)
-			if err == nil {
-				s.k = newK
-			}
-			anim := s.k.CurrentAnimation()
-			s.mu.Unlock()
+			currentPet, _ := s.v.Current()
+			s.mu.RLock()
+			k := s.k
+			s.mu.RUnlock()
+			anim, err := k.PlayAnimation(currentPet, animName)
 			if err != nil {
 				return nil, nil, err
 			}
-			s.v.Show(anim)
+			s.v.Show(currentPet, anim)
 			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Playing " + animName}}}, nil, nil
 		})
 	}
 
-	if otherPets := s.k.OtherPetNames(); len(otherPets) > 0 {
+	if otherPets := s.k.OtherPetNames(petName); len(otherPets) > 0 {
 		mcp.AddTool(s.mcpServer, &mcp.Tool{
 			Name:        "change_pet",
 			Description: "Switch the active pet",
 			InputSchema: buildChangePetSchema(otherPets),
 		}, func(_ context.Context, _ *mcp.CallToolRequest, input changePetInput) (*mcp.CallToolResult, any, error) {
-			s.mu.Lock()
-			newK, err := s.k.ChangePet(input.Name, input.Animation)
+			s.mu.RLock()
+			k := s.k
+			s.mu.RUnlock()
+			anim, err := k.ChangePet(input.Name, input.Animation)
 			if err != nil {
-				s.mu.Unlock()
 				return nil, nil, err
 			}
-			s.k = newK
-			s.registerTools()
-			anim := s.k.CurrentAnimation()
+			s.mu.Lock()
+			s.registerTools(input.Name)
 			s.mu.Unlock()
-			s.v.Show(anim)
+			s.v.Show(input.Name, anim)
 			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Switched to " + input.Name}}}, nil, nil
 		})
 	}
 }
 
 func (s *server) onConfigChange(cfg config.Config) {
+	k := pet.NewKeeper(cfg)
+	petName := k.DefaultPet()
+	anim, _ := k.DefaultAnim(petName)
 	s.mu.Lock()
-	s.k = pet.NewKeeper(cfg)
-	s.registerTools()
-	anim := s.k.CurrentAnimation()
+	s.k = k
+	s.registerTools(petName)
 	s.mu.Unlock()
-	s.v.Show(anim)
+	s.v.Show(petName, anim)
 }
 
 func (s *server) Run(ctx context.Context) {
@@ -209,11 +165,6 @@ func (s *server) Run(ctx context.Context) {
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-
-	s.mu.RLock()
-	anim := s.k.CurrentAnimation()
-	s.mu.RUnlock()
-	s.v.Show(anim)
 
 outer:
 	for {

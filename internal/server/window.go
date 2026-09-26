@@ -7,21 +7,21 @@ import (
 	"github.com/ryotaro612/agentpet/internal/view"
 )
 
-type windowTool struct {
+type mcpTool struct {
 	tool    mcp.Tool
 	handler mcp.ToolHandlerFor[struct{}, any]
 }
 
-func showWindowTool(v *view.View) windowTool {
+func showWindowTool(v *view.View) mcpTool {
 	return newWindowTool("show_window", "Show the pet window", v.ShowWindow, "Window is now visible")
 }
 
-func hideWindowTool(v *view.View) windowTool {
+func hideWindowTool(v *view.View) mcpTool {
 	return newWindowTool("hide_window", "Hide the pet window", v.HideWindow, "Window is now hidden")
 }
 
-func newWindowTool(name, description string, action func(), result string) windowTool {
-	return windowTool{
+func newWindowTool(name, description string, action func(), result string) mcpTool {
+	return mcpTool{
 		tool: mcp.Tool{Name: name, Description: description},
 		handler: func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
 			action()
