@@ -135,12 +135,12 @@ func (v *View) dispatch(ctx context.Context, readyCh <-chan struct{}) {
 			return
 		case anim := <-v.animCh:
 			v.w.Dispatch(func() {
-				window, displayFrame := anim.Layout()
+				win := anim.Window()
 				if !shown {
-					SetWindowSize(v.w.Window(), window.Width, window.Height)
+					SetWindowSize(v.w.Window(), win.Width, win.Height)
 					shown = true
 				} else {
-					ResizeWindowKeepingPosition(v.w.Window(), window.Width, window.Height)
+					ResizeWindowKeepingPosition(v.w.Window(), win.Width, win.Height)
 				}
 				fps, fpsErr := anim.CalcFps()
 				if fpsErr != nil {
@@ -148,14 +148,15 @@ func (v *View) dispatch(ctx context.Context, readyCh <-chan struct{}) {
 						"animation", anim.Name, "err", fpsErr)
 					return
 				}
-				filePath, _ := anim.AbsFilePath()
-				if filePath == "" {
+				filePath, err := anim.FileSchemaPath()
+				if err != nil {
+					v.logger.Warn("skipping animation: cannot resolve path",
+						"animation", anim.Name, "err", err)
 					return
 				}
+				frame := anim.FrameSize()
 				v.w.Eval(fmt.Sprintf("showAnimation(%q, %d, %d, %d, %d, %d)",
-					"file://"+filePath, fps,
-					anim.Frame.Width, anim.Frame.Height,
-					displayFrame.Width, displayFrame.Height))
+					filePath, fps, frame.Width, frame.Height, win.Width, win.Height))
 			})
 		}
 	}

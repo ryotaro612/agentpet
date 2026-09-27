@@ -26,10 +26,6 @@ type Dimension struct {
 	Height int
 }
 
-func (d Dimension) NonZero() bool {
-	return d.Width > 0 || d.Height > 0
-}
-
 func (a Animation) live() error {
 	_, err := a.imageSize()
 	return err
@@ -37,6 +33,14 @@ func (a Animation) live() error {
 
 func (a Animation) AbsFilePath() (string, error) {
 	return filepath.Abs(a.filePath)
+}
+
+func (a Animation) FileSchemaPath() (string, error) {
+	p, err := filepath.Abs(a.filePath)
+	if err != nil {
+		return "", err
+	}
+	return "file://" + p, nil
 }
 
 func (a Animation) imageSize() (Dimension, error) {
@@ -56,49 +60,36 @@ func (a Animation) imageSize() (Dimension, error) {
 	return Dimension{Width: cfg.Width, Height: cfg.Height}, nil
 }
 
-// Layout returns the OS window size and the display frame size for rendering.
-// If a.window has exactly one dimension set, the other is inferred from the
-// image's aspect ratio. If the window is smaller than a.Frame in either
-// dimension, the display frame is scaled down to fit within the window while
-// preserving the frame's aspect ratio.
-func (a Animation) Layout() (window, displayFrame Dimension) {
+// Window returns the OS window dimensions for this animation.
+// If one dimension is configured, the other is inferred from the frame's
+// aspect ratio. If both are configured, the frame is scaled to fill the
+// window (preserving aspect ratio), and the window is shrunk to that size.
+func (a Animation) Window() Dimension {
 	w, h := a.window.Width, a.window.Height
 	switch {
 	case w > 0 && h > 0:
-		window = a.window
-	case w > 0 || h > 0:
-		if img, err := a.imageSize(); err == nil && img.Width > 0 && img.Height > 0 {
-			if w > 0 {
-				h = w * img.Height / img.Width
-			} else {
-				w = h * img.Width / img.Height
-			}
-		}
-		window = Dimension{Width: w, Height: h}
+		scaleW := float64(w) / float64(a.Frame.Width)
+		scaleH := float64(h) / float64(a.Frame.Height)
+		scale := min(scaleW, scaleH)
+		return Dimension{Width: int(float64(a.Frame.Width) * scale), Height: int(float64(a.Frame.Height) * scale)}
+	case w > 0:
+		return Dimension{Width: w, Height: w * a.Frame.Height / a.Frame.Width}
+	case h > 0:
+		return Dimension{Width: h * a.Frame.Width / a.Frame.Height, Height: h}
 	default:
-		if a.Frame.NonZero() {
-			window = a.Frame
-		} else {
-			window, _ = a.imageSize()
-		}
+		return a.Frame
 	}
+}
 
-	if !a.Frame.NonZero() {
-		displayFrame = window
-		return
-	}
-	if !window.NonZero() || (window.Width >= a.Frame.Width && window.Height >= a.Frame.Height) {
-		displayFrame = a.Frame
-		return
-	}
-	scaleW := float64(window.Width) / float64(a.Frame.Width)
-	scaleH := float64(window.Height) / float64(a.Frame.Height)
-	scale := min(scaleW, scaleH)
-	displayFrame = Dimension{
-		Width:  int(float64(a.Frame.Width) * scale),
-		Height: int(float64(a.Frame.Height) * scale),
-	}
-	return
+// DisplayFrame returns the dimensions at which each spritesheet frame is
+// rendered. The frame always fills the window, so this equals Window().
+func (a Animation) DisplayFrame() Dimension {
+	return a.Window()
+}
+
+// FrameSize returns the spritesheet frame dimensions.
+func (a Animation) FrameSize() Dimension {
+	return a.Frame
 }
 
 // CalcFps returns a.fps when set, otherwise infers fps from the number of
