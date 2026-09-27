@@ -100,18 +100,13 @@ func parse(argv []string, output io.Writer) (parsedArgs, error) {
 		if err := petCmd.Parse(subArgs); err != nil {
 			return parsedArgs{}, err
 		}
-		if len(petCmd.Args()) == 0 {
-			return parsedArgs{}, fmt.Errorf("pet: <name> is required")
+		if len(petCmd.Args()) > 0 {
+			result.pet.pet = petCmd.Args()[0]
 		}
-		animName := ""
 		if len(petCmd.Args()) > 1 {
-			animName = petCmd.Args()[1]
+			result.pet.animation = petCmd.Args()[1]
 		}
-		result.pet = petArgs{
-			verbose: *verbose,
-			pet:     petCmd.Args()[0],
-		}
-		result.pet.animation = animName
+		result.pet.verbose = *verbose
 	case subcmdPets:
 		if err := petsCmd.Parse(subArgs); err != nil {
 			return parsedArgs{}, err

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/ryotaro612/agentpet/internal"
 	"github.com/ryotaro612/agentpet/internal/view"
 )
 
@@ -29,7 +30,7 @@ func (ts mcpTools) names() []string {
 // registerTools must be called with s.mu held for writing.
 func (s *server) registerTools(petName string, oldAnimTools []string) {
 	lp := listPetsTool(s.k, s.v)
-	s.mcpServer.RemoveTools(append(oldAnimTools, "change_pet", lp.toolName())...)
+	s.mcpServer.RemoveTools(append(oldAnimTools, internal.ToolChangePet, lp.toolName())...)
 	mcp.AddTool(s.mcpServer, &lp.tool, lp.handler)
 
 	animTools := playAnimationTools(petName, s)
@@ -43,11 +44,11 @@ func (s *server) registerTools(petName string, oldAnimTools []string) {
 }
 
 func showWindowTool(v *view.View) mcpTool {
-	return newWindowTool("show_window", "Show the pet window", v.ShowWindow, "Window is now visible")
+	return newWindowTool(internal.ToolShowWindow, "Show the pet window", v.ShowWindow, "Window is now visible")
 }
 
 func hideWindowTool(v *view.View) mcpTool {
-	return newWindowTool("hide_window", "Hide the pet window", v.HideWindow, "Window is now hidden")
+	return newWindowTool(internal.ToolHideWindow, "Hide the pet window", v.HideWindow, "Window is now hidden")
 }
 
 func newWindowTool(name, description string, action func(), result string) mcpTool {

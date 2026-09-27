@@ -13,6 +13,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ryotaro612/agentpet/internal"
+	
 )
 
 func main() {
@@ -54,9 +55,9 @@ func main() {
 	case subcmdPets:
 		runErr = cmdPets(ctx, session, logger)
 	case subcmdShow:
-		runErr = cmdWindow(ctx, session, "show_window", logger)
+		runErr = cmdWindow(ctx, session, internal.ToolShowWindow, logger)
 	case subcmdHide:
-		runErr = cmdWindow(ctx, session, "hide_window", logger)
+		runErr = cmdWindow(ctx, session, internal.ToolHideWindow, logger)
 	}
 	if runErr != nil {
 		fmt.Fprintln(os.Stderr, "error:", runErr)
@@ -67,7 +68,7 @@ func main() {
 func cmdAnimation(ctx context.Context, session *mcp.ClientSession, name string, logger *slog.Logger) error {
 	var toolName string
 	if name != "" {
-		toolName = "play_" + name
+		toolName = internal.ToolPlayPrefix + name
 	} else {
 		tools, err := session.ListTools(ctx, &mcp.ListToolsParams{})
 		if err != nil {
@@ -75,7 +76,7 @@ func cmdAnimation(ctx context.Context, session *mcp.ClientSession, name string, 
 		}
 		var animTools []string
 		for _, t := range tools.Tools {
-			if strings.HasPrefix(t.Name, "play_") {
+			if strings.HasPrefix(t.Name, internal.ToolPlayPrefix) {
 				animTools = append(animTools, t.Name)
 			}
 		}
@@ -90,9 +91,10 @@ func cmdAnimation(ctx context.Context, session *mcp.ClientSession, name string, 
 					others = append(others, t)
 				}
 			}
-			if len(others) > 0 {
-				candidates = others
+			if len(others) == 0 {
+				return fmt.Errorf("no other animations to switch to")
 			}
+			candidates = others
 		}
 		toolName = candidates[rand.IntN(len(candidates))]
 	}
@@ -106,35 +108,40 @@ func cmdAnimation(ctx context.Context, session *mcp.ClientSession, name string, 
 }
 
 // currentAnimToolName returns the "play_<name>" tool name of the currently
-// active animation by calling list_pets. Returns "" on any error so the caller
-// can fall back gracefully.
+// active animation. Returns "" on any error so the caller can fall back gracefully.
 func currentAnimToolName(ctx context.Context, session *mcp.ClientSession) string {
-	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "list_pets"})
-	if err != nil || len(result.Content) == 0 {
+	resp, err := listPets(ctx, session)
+	if err != nil || resp.Active.Animation == "" {
 		return ""
 	}
-	text, ok := result.Content[0].(*mcp.TextContent)
-	if !ok {
-		return ""
-	}
-	var resp petsResponse
-	if json.Unmarshal([]byte(text.Text), &resp) != nil {
-		return ""
-	}
-	if resp.Active.Animation == "" {
-		return ""
-	}
-	return "play_" + resp.Active.Animation
+	return internal.ToolPlayPrefix + resp.Active.Animation
 }
 
 func cmdPet(ctx context.Context, session *mcp.ClientSession, pet, animation string, logger *slog.Logger) error {
-	callArgs := map[string]any{"name": pet}
-	if animation != "" {
-		callArgs["animation"] = animation
+	if pet == "" {
+		resp, err := listPets(ctx, session)
+		if err != nil {
+			return err
+		}
+		others := make([]string, 0, len(resp.Pets))
+		for _, p := range resp.Pets {
+			if p.Name != resp.Active.Pet {
+				others = append(others, p.Name)
+			}
+		}
+		if len(others) == 0 {
+			return fmt.Errorf("no other pets to switch to")
+		}
+		pet = others[rand.IntN(len(others))]
+	}
+	input := internal.ChangePetInput{Name: pet, Animation: animation}
+	callArgs := map[string]any{"name": input.Name}
+	if input.Animation != "" {
+		callArgs["animation"] = input.Animation
 	}
 	logger.Debug("calling change_pet", "args", callArgs)
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
-		Name:      "change_pet",
+		Name:      internal.ToolChangePet,
 		Arguments: callArgs,
 	})
 	if err != nil {
@@ -144,38 +151,30 @@ func cmdPet(ctx context.Context, session *mcp.ClientSession, pet, animation stri
 	return nil
 }
 
-type petsResponse struct {
-	Active struct {
-		Pet       string `json:"pet"`
-		Animation string `json:"animation"`
-	} `json:"active"`
-	Pets []struct {
-		Name        string  `json:"name"`
-		Description *string `json:"description"`
-		Animations  []struct {
-			Name        string  `json:"name"`
-			Description *string `json:"description"`
-		} `json:"animations"`
-	} `json:"pets"`
+func listPets(ctx context.Context, session *mcp.ClientSession) (internal.PetsResponse, error) {
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: internal.ToolListPets})
+	if err != nil {
+		return internal.PetsResponse{}, fmt.Errorf("listing pets: %w", err)
+	}
+	if len(result.Content) == 0 {
+		return internal.PetsResponse{}, fmt.Errorf("empty response from list_pets")
+	}
+	text, ok := result.Content[0].(*mcp.TextContent)
+	if !ok {
+		return internal.PetsResponse{}, fmt.Errorf("unexpected content type from list_pets")
+	}
+	var resp internal.PetsResponse
+	if err := json.Unmarshal([]byte(text.Text), &resp); err != nil {
+		return internal.PetsResponse{}, fmt.Errorf("parsing pets response: %w", err)
+	}
+	return resp, nil
 }
 
 func cmdPets(ctx context.Context, session *mcp.ClientSession, logger *slog.Logger) error {
 	logger.Debug("calling list_pets")
-	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "list_pets"})
+	resp, err := listPets(ctx, session)
 	if err != nil {
-		return fmt.Errorf("calling list_pets: %w", err)
-	}
-	if len(result.Content) == 0 {
-		return nil
-	}
-	text, ok := result.Content[0].(*mcp.TextContent)
-	if !ok {
-		return fmt.Errorf("unexpected content type")
-	}
-	var resp petsResponse
-	if err := json.Unmarshal([]byte(text.Text), &resp); err != nil {
-		fmt.Println(text.Text)
-		return nil
+		return err
 	}
 	for _, p := range resp.Pets {
 		active := ""

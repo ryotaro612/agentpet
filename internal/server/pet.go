@@ -5,16 +5,12 @@ import (
 	"encoding/json"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/ryotaro612/agentpet/internal"
 )
-
-type changePetInput struct {
-	Name      string `json:"name"`
-	Animation string `json:"animation"`
-}
 
 type changePetMcpTool struct {
 	tool    mcp.Tool
-	handler mcp.ToolHandlerFor[changePetInput, any]
+	handler mcp.ToolHandlerFor[internal.ChangePetInput, any]
 }
 
 func changePetTool(petName string, s *server) (changePetMcpTool, bool) {
@@ -25,11 +21,11 @@ func changePetTool(petName string, s *server) (changePetMcpTool, bool) {
 	schema := buildChangePetSchema(otherPets)
 	return changePetMcpTool{
 		tool: mcp.Tool{
-			Name:        "change_pet",
+			Name:        internal.ToolChangePet,
 			Description: "Switch the active pet",
 			InputSchema: schema,
 		},
-		handler: func(_ context.Context, _ *mcp.CallToolRequest, input changePetInput) (*mcp.CallToolResult, any, error) {
+		handler: func(_ context.Context, _ *mcp.CallToolRequest, input internal.ChangePetInput) (*mcp.CallToolResult, any, error) {
 			s.mu.RLock()
 			k := s.k
 			s.mu.RUnlock()

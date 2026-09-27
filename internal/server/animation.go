@@ -4,13 +4,14 @@ import (
 	"context"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/ryotaro612/agentpet/internal"
 )
 
 func playAnimationTools(petName string, s *server) mcpTools {
 	anims := s.k.Animations(petName)
 	tools := make([]mcpTool, 0, len(anims))
 	for _, a := range anims {
-		name := "play_" + a.Name
+		name := internal.ToolPlayPrefix + a.Name
 		desc := a.Description
 		if desc == "" {
 			desc = "Play the " + a.Name + " animation"

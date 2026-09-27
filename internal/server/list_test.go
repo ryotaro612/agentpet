@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/ryotaro612/agentpet/internal"
 	"github.com/ryotaro612/agentpet/internal/config"
 	"github.com/ryotaro612/agentpet/internal/view"
 )
@@ -54,7 +55,13 @@ func TestToolList(t *testing.T) {
 	}
 	sort.Strings(got)
 
-	want := []string{"hide_window", "list_pets", "play_idle", "play_walk", "show_window"}
+	want := []string{
+		internal.ToolHideWindow,
+		internal.ToolListPets,
+		internal.ToolPlayPrefix + "idle",
+		internal.ToolPlayPrefix + "walk",
+		internal.ToolShowWindow,
+	}
 
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("tool list mismatch (-want +got):\n%s", diff)

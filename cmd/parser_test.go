@@ -53,9 +53,9 @@ func TestParse(t *testing.T) {
 			wantErr: `unknown subcommand "unknown"`,
 		},
 		{
-			name:    "returns an error when the pet subcommand is given no name",
-			argv:    []string{"-p", "8080", "pet"},
-			wantErr: "pet: <name> is required",
+			name: "selects a pet at random when no name is given",
+			argv: []string{"-p", "8080", "pet"},
+			want: parsedArgs{port: 8080, command: "pet"},
 		},
 		{
 			name:   "prints help and returns ErrHelp when -h is passed",
