@@ -6,66 +6,128 @@ import (
 	"io"
 )
 
-type args struct {
-	Port    int
-	Verbose bool
-	Command string
-	Rest    []string
+const (
+	appName    = "petowner"
+	subcmdAnim = "animation"
+	subcmdPet  = "pet"
+	subcmdPets = "pets"
+	subcmdShow = "show"
+	subcmdHide = "hide"
+)
+
+type animationArgs struct {
+	animation string
 }
 
-func parse(argv []string, output io.Writer) (args, error) {
-	fs := flag.NewFlagSet("agentpet-client", flag.ContinueOnError)
+type petArgs struct {
+	verbose bool
+	pet     string
+	animationArgs
+}
+
+type parsedArgs struct {
+	port      int
+	command   string
+	verbose   bool
+	animation animationArgs
+	pet       petArgs
+}
+
+func parse(argv []string, output io.Writer) (parsedArgs, error) {
+	fs := flag.NewFlagSet(appName, flag.ContinueOnError)
 	fs.SetOutput(output)
 	port := fs.Int("p", 0, "MCP server `port`")
 	verbose := fs.Bool("v", false, "verbose output")
 
-	animationCmd := flag.NewFlagSet("animation", flag.ContinueOnError)
+	animationCmd := flag.NewFlagSet(subcmdAnim, flag.ContinueOnError)
 	animationCmd.SetOutput(output)
-	petCmd := flag.NewFlagSet("pet", flag.ContinueOnError)
+
+	petCmd := flag.NewFlagSet(subcmdPet, flag.ContinueOnError)
 	petCmd.SetOutput(output)
-	petsCmd := flag.NewFlagSet("pets", flag.ContinueOnError)
+
+	petsCmd := flag.NewFlagSet(subcmdPets, flag.ContinueOnError)
 	petsCmd.SetOutput(output)
-	showCmd := flag.NewFlagSet("show", flag.ContinueOnError)
+
+	showCmd := flag.NewFlagSet(subcmdShow, flag.ContinueOnError)
 	showCmd.SetOutput(output)
-	hideCmd := flag.NewFlagSet("hide", flag.ContinueOnError)
+
+	hideCmd := flag.NewFlagSet(subcmdHide, flag.ContinueOnError)
 	hideCmd.SetOutput(output)
 
+	fs.Usage = func() {
+		fmt.Fprintf(output, "Usage: %s -p <port> [-v] <subcommand> [args]\n\n", appName)
+		fmt.Fprintf(output, "Flags:\n")
+		fs.PrintDefaults()
+		fmt.Fprintf(output, "\nSubcommands:\n")
+		fmt.Fprintf(output, "  %s [name]\n", subcmdAnim)
+		fmt.Fprintf(output, "  %s <name> [animation]\n", subcmdPet)
+		fmt.Fprintf(output, "  %s\n", subcmdPets)
+		fmt.Fprintf(output, "  %s\n", subcmdShow)
+		fmt.Fprintf(output, "  %s\n", subcmdHide)
+	}
+
 	if err := fs.Parse(argv); err != nil {
-		return args{}, err
+		return parsedArgs{}, err
 	}
 	if *port == 0 {
 		fmt.Fprintln(output, "error: -p <port> is required")
 		fs.Usage()
-		return args{}, fmt.Errorf("-p <port> is required")
+		return parsedArgs{}, fmt.Errorf("-p <port> is required")
 	}
 
 	rest := fs.Args()
 	if len(rest) == 0 {
 		fmt.Fprintln(output, "error: subcommand is required")
 		fs.Usage()
-		return args{}, fmt.Errorf("subcommand is required")
+		return parsedArgs{}, fmt.Errorf("subcommand is required")
 	}
 
 	cmd := rest[0]
-	var sub *flag.FlagSet
+	subArgs := rest[1:]
+	result := parsedArgs{port: *port, command: cmd, verbose: *verbose}
+
 	switch cmd {
-	case "animation":
-		sub = animationCmd
-	case "pet":
-		sub = petCmd
-	case "pets":
-		sub = petsCmd
-	case "show":
-		sub = showCmd
-	case "hide":
-		sub = hideCmd
+	case subcmdAnim:
+		if err := animationCmd.Parse(subArgs); err != nil {
+			return parsedArgs{}, err
+		}
+		name := ""
+		if len(animationCmd.Args()) > 0 {
+			name = animationCmd.Args()[0]
+		}
+		result.animation = animationArgs{animation: name}
+	case subcmdPet:
+		if err := petCmd.Parse(subArgs); err != nil {
+			return parsedArgs{}, err
+		}
+		if len(petCmd.Args()) == 0 {
+			return parsedArgs{}, fmt.Errorf("pet: <name> is required")
+		}
+		animName := ""
+		if len(petCmd.Args()) > 1 {
+			animName = petCmd.Args()[1]
+		}
+		result.pet = petArgs{
+			verbose: *verbose,
+			pet:     petCmd.Args()[0],
+		}
+		result.pet.animation = animName
+	case subcmdPets:
+		if err := petsCmd.Parse(subArgs); err != nil {
+			return parsedArgs{}, err
+		}
+	case subcmdShow:
+		if err := showCmd.Parse(subArgs); err != nil {
+			return parsedArgs{}, err
+		}
+	case subcmdHide:
+		if err := hideCmd.Parse(subArgs); err != nil {
+			return parsedArgs{}, err
+		}
 	default:
 		fmt.Fprintf(output, "error: unknown subcommand %q\n", cmd)
-		return args{}, fmt.Errorf("unknown subcommand %q", cmd)
+		return parsedArgs{}, fmt.Errorf("unknown subcommand %q", cmd)
 	}
 
-	if err := sub.Parse(rest[1:]); err != nil {
-		return args{}, err
-	}
-	return args{Port: *port, Verbose: *verbose, Command: cmd, Rest: sub.Args()}, nil
+	return result, nil
 }

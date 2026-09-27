@@ -4,7 +4,6 @@ import (
 	"errors"
 	"flag"
 	"io"
-	"slices"
 	"testing"
 )
 
@@ -14,29 +13,29 @@ func TestParse(t *testing.T) {
 	cases := []struct {
 		name    string
 		argv    []string
-		want    args
+		want    parsedArgs
 		wantErr string
 		isHelp  bool
 	}{
 		{
 			name: "parses port and a subcommand",
 			argv: []string{"-p", "8080", "pets"},
-			want: args{Port: 8080, Command: "pets"},
+			want: parsedArgs{port: 8080, command: "pets"},
 		},
 		{
 			name: "parses the verbose flag",
 			argv: []string{"-p", "8080", "-v", "pets"},
-			want: args{Port: 8080, Verbose: true, Command: "pets"},
+			want: parsedArgs{port: 8080, command: "pets", verbose: true},
 		},
 		{
-			name: "treats arguments after the subcommand as rest",
+			name: "parses an optional animation name for the animation subcommand",
 			argv: []string{"-p", "8080", "animation", "idle"},
-			want: args{Port: 8080, Command: "animation", Rest: []string{"idle"}},
+			want: parsedArgs{port: 8080, command: "animation", animation: animationArgs{animation: "idle"}},
 		},
 		{
-			name: "treats the pet name and optional animation as rest",
+			name: "parses the pet name and optional animation name for the pet subcommand",
 			argv: []string{"-p", "8080", "pet", "cat", "idle"},
-			want: args{Port: 8080, Command: "pet", Rest: []string{"cat", "idle"}},
+			want: parsedArgs{port: 8080, command: "pet", pet: petArgs{pet: "cat", animationArgs: animationArgs{animation: "idle"}}},
 		},
 		{
 			name:    "returns an error when -p is not provided",
@@ -52,6 +51,11 @@ func TestParse(t *testing.T) {
 			name:    "returns an error for an unrecognised subcommand",
 			argv:    []string{"-p", "8080", "unknown"},
 			wantErr: `unknown subcommand "unknown"`,
+		},
+		{
+			name:    "returns an error when the pet subcommand is given no name",
+			argv:    []string{"-p", "8080", "pet"},
+			wantErr: "pet: <name> is required",
 		},
 		{
 			name:   "prints help and returns ErrHelp when -h is passed",
@@ -82,17 +86,8 @@ func TestParse(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parse(%v) error = %v", c.argv, err)
 			}
-			if got.Port != c.want.Port {
-				t.Errorf("Port = %d, want %d", got.Port, c.want.Port)
-			}
-			if got.Verbose != c.want.Verbose {
-				t.Errorf("Verbose = %v, want %v", got.Verbose, c.want.Verbose)
-			}
-			if got.Command != c.want.Command {
-				t.Errorf("Command = %q, want %q", got.Command, c.want.Command)
-			}
-			if !slices.Equal(got.Rest, c.want.Rest) {
-				t.Errorf("Rest = %v, want %v", got.Rest, c.want.Rest)
+			if got != c.want {
+				t.Errorf("parse(%v)\n  got  %+v\n  want %+v", c.argv, got, c.want)
 			}
 		})
 	}
