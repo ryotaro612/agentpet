@@ -163,8 +163,8 @@ func TestKeeperChangePet(t *testing.T) {
 		t.Parallel()
 		cfg := config.Config{
 			Pets: []config.PetConfig{{
-				Name:  "cat",
-				Frame: config.DimensionConfig{Width: 32, Height: 32},
+				Name:       "cat",
+				Frame:      config.DimensionConfig{Width: 32, Height: 32},
 				Animations: []config.AnimationConfig{{Name: "idle", File: "idle.png"}},
 			}},
 		}
@@ -178,8 +178,8 @@ func TestKeeperChangePet(t *testing.T) {
 		path := writePNG(t, 32, 32)
 		cfg := config.Config{
 			Pets: []config.PetConfig{{
-				Name:  "cat",
-				Frame: config.DimensionConfig{Width: 32, Height: 32},
+				Name:       "cat",
+				Frame:      config.DimensionConfig{Width: 32, Height: 32},
 				Animations: []config.AnimationConfig{{Name: "idle", File: path}},
 			}},
 		}

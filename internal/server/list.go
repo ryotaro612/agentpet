@@ -18,8 +18,6 @@ func listPetsTool(k pet.Keeper, v *view.View) mcpTool {
 		},
 		handler: func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
 			allPets := k.AllPets()
-			state := v.Current()
-
 			pets := make([]internal.PetEntry, 0, len(allPets))
 			for _, p := range allPets {
 				anims := make([]internal.AnimEntry, 0, len(p.Animations))
@@ -33,7 +31,7 @@ func listPetsTool(k pet.Keeper, v *view.View) mcpTool {
 				pets = append(pets, internal.PetEntry{Name: p.Name, Animations: anims})
 			}
 			b, err := json.Marshal(internal.PetsResponse{
-				Active: internal.ActiveEntry{Pet: state.Pet, Animation: state.Animation},
+				Active: internal.ActiveEntry{Pet: v.CurrentPet(), Animation: v.CurrentAnimation()},
 				Pets:   pets,
 			})
 			if err != nil {

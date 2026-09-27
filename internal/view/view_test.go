@@ -22,12 +22,11 @@ func TestViewCurrent(t *testing.T) {
 		t.Parallel()
 		v := &View{animCh: make(chan pet.Animation, 1)}
 		v.Show("cat", pet.Animation{Name: "idle"})
-		got := v.Current()
-		if got.Pet != "cat" {
-			t.Errorf("Current().Pet = %q, want %q", got.Pet, "cat")
+		if got := v.CurrentPet(); got != "cat" {
+			t.Errorf("CurrentPet() = %q, want %q", got, "cat")
 		}
-		if got.Animation != "idle" {
-			t.Errorf("Current().Animation = %q, want %q", got.Animation, "idle")
+		if got := v.CurrentAnimation(); got != "idle" {
+			t.Errorf("CurrentAnimation() = %q, want %q", got, "idle")
 		}
 	})
 }
@@ -37,7 +36,7 @@ func TestViewDispatch(t *testing.T) {
 
 	t.Run("calls SetWindowSize on the first animation", func(t *testing.T) {
 		t.Parallel()
-		mock := newMockView()
+		mock := NewMockInternalView()
 		v := newTestView(mock)
 		readyCh := make(chan struct{})
 		close(readyCh)
@@ -50,24 +49,24 @@ func TestViewDispatch(t *testing.T) {
 		}()
 
 		v.animCh <- animForTest(8, pet.Dimension{Width: 32, Height: 32})
-		<-mock.dispatchDone
+		<-mock.DispatchDone
 		cancel()
 		<-done
 
-		if len(mock.setWindowSizeCalls) != 1 {
-			t.Errorf("SetWindowSize called %d time(s), want 1", len(mock.setWindowSizeCalls))
+		if len(mock.SetWindowSizeCalls) != 1 {
+			t.Errorf("SetWindowSize called %d time(s), want 1", len(mock.SetWindowSizeCalls))
 		}
-		if len(mock.resizeWindowCalls) != 0 {
-			t.Errorf("ResizeWindowKeepingPosition called %d time(s), want 0", len(mock.resizeWindowCalls))
+		if len(mock.ResizeWindowCalls) != 0 {
+			t.Errorf("ResizeWindowKeepingPosition called %d time(s), want 0", len(mock.ResizeWindowCalls))
 		}
-		if len(mock.evalCalls) != 1 {
-			t.Errorf("Eval called %d time(s), want 1", len(mock.evalCalls))
+		if len(mock.EvalCalls) != 1 {
+			t.Errorf("Eval called %d time(s), want 1", len(mock.EvalCalls))
 		}
 	})
 
 	t.Run("calls ResizeWindowKeepingPosition on subsequent animations", func(t *testing.T) {
 		t.Parallel()
-		mock := newMockView()
+		mock := NewMockInternalView()
 		v := newTestView(mock)
 		readyCh := make(chan struct{})
 		close(readyCh)
@@ -81,23 +80,23 @@ func TestViewDispatch(t *testing.T) {
 
 		anim := animForTest(8, pet.Dimension{Width: 32, Height: 32})
 		v.animCh <- anim
-		<-mock.dispatchDone
+		<-mock.DispatchDone
 		v.animCh <- anim
-		<-mock.dispatchDone
+		<-mock.DispatchDone
 		cancel()
 		<-done
 
-		if len(mock.setWindowSizeCalls) != 1 {
-			t.Errorf("SetWindowSize called %d time(s), want 1", len(mock.setWindowSizeCalls))
+		if len(mock.SetWindowSizeCalls) != 1 {
+			t.Errorf("SetWindowSize called %d time(s), want 1", len(mock.SetWindowSizeCalls))
 		}
-		if len(mock.resizeWindowCalls) != 1 {
-			t.Errorf("ResizeWindowKeepingPosition called %d time(s), want 1", len(mock.resizeWindowCalls))
+		if len(mock.ResizeWindowCalls) != 1 {
+			t.Errorf("ResizeWindowKeepingPosition called %d time(s), want 1", len(mock.ResizeWindowCalls))
 		}
 	})
 
 	t.Run("given a valid animation, adjusts the window size and calls showAnimation with the correct arguments", func(t *testing.T) {
 		t.Parallel()
-		mock := newMockView()
+		mock := NewMockInternalView()
 		v := newTestView(mock)
 		readyCh := make(chan struct{})
 		close(readyCh)
@@ -120,9 +119,9 @@ func TestViewDispatch(t *testing.T) {
 		}()
 
 		v.animCh <- anim
-		<-mock.dispatchDone
+		<-mock.DispatchDone
 		v.animCh <- anim
-		<-mock.dispatchDone
+		<-mock.DispatchDone
 		cancel()
 		<-done
 
@@ -132,61 +131,23 @@ func TestViewDispatch(t *testing.T) {
 		}
 		// No window configured: the window matches the sprite frame (32×32).
 		wantDim := [2]int{32, 32}
-		if len(mock.setWindowSizeCalls) != 1 || mock.setWindowSizeCalls[0] != wantDim {
-			t.Errorf("window size on first play = %v, want [%v]", mock.setWindowSizeCalls, wantDim)
+		if len(mock.SetWindowSizeCalls) != 1 || mock.SetWindowSizeCalls[0] != wantDim {
+			t.Errorf("window size on first play = %v, want [%v]", mock.SetWindowSizeCalls, wantDim)
 		}
-		if len(mock.resizeWindowCalls) != 1 || mock.resizeWindowCalls[0] != wantDim {
-			t.Errorf("window size on second play = %v, want [%v]", mock.resizeWindowCalls, wantDim)
+		if len(mock.ResizeWindowCalls) != 1 || mock.ResizeWindowCalls[0] != wantDim {
+			t.Errorf("window size on second play = %v, want [%v]", mock.ResizeWindowCalls, wantDim)
 		}
 		wantEval := fmt.Sprintf("showAnimation(%q, 2, 32, 32, 32, 32)", "file://"+absPath)
-		for i, got := range mock.evalCalls {
+		for i, got := range mock.EvalCalls {
 			if got != wantEval {
 				t.Errorf("animation rendered on play %d = %q, want %q", i+1, got, wantEval)
 			}
 		}
-		if len(mock.evalCalls) != 2 {
-			t.Errorf("animation rendered %d time(s) across two plays, want 2", len(mock.evalCalls))
+		if len(mock.EvalCalls) != 2 {
+			t.Errorf("animation rendered %d time(s) across two plays, want 2", len(mock.EvalCalls))
 		}
 	})
 
-}
-
-// mockView records calls made by dispatch and executes Dispatch closures
-// synchronously so tests can assert state after a known number of animations.
-type mockView struct {
-	setWindowSizeCalls [][2]int
-	resizeWindowCalls  [][2]int
-	evalCalls          []string
-	// dispatchDone receives a value after each Dispatch closure completes.
-	dispatchDone chan struct{}
-}
-
-func newMockView() *mockView {
-	return &mockView{dispatchDone: make(chan struct{}, 16)}
-}
-
-func (m *mockView) PreventTerminateOnHide()    {}
-func (m *mockView) SetUpWIndow()               {}
-func (m *mockView) PreventHide()               {}
-func (m *mockView) SetupQuit()                 {}
-func (m *mockView) MoveWindow(_, _ float64)    {}
-func (m *mockView) SHowWindow()                {}
-func (m *mockView) HideWindow()                {}
-func (m *mockView) Bind(_ string, _ any) error { return nil }
-func (m *mockView) Navigate(_ string)          {}
-func (m *mockView) Terminate()                 {}
-func (m *mockView) Run()                       {}
-func (m *mockView) Destroy()                   {}
-func (m *mockView) SetWindowSize(w, h int) {
-	m.setWindowSizeCalls = append(m.setWindowSizeCalls, [2]int{w, h})
-}
-func (m *mockView) ResizeWindowKeepingPosition(w, h int) {
-	m.resizeWindowCalls = append(m.resizeWindowCalls, [2]int{w, h})
-}
-func (m *mockView) Eval(js string) { m.evalCalls = append(m.evalCalls, js) }
-func (m *mockView) Dispatch(f func()) {
-	f()
-	m.dispatchDone <- struct{}{}
 }
 
 // animForTest returns an Animation with explicit fps so CalcFps succeeds
@@ -222,7 +183,7 @@ func writeSpritePNG(t *testing.T, w, h int) string {
 	return path
 }
 
-func newTestView(m *mockView) *View {
+func newTestView(m *MockInternalView) *View {
 	return &View{
 		w:      m,
 		animCh: make(chan pet.Animation, 1),
