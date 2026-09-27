@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"math/rand/v2"
@@ -13,35 +14,15 @@ import (
 )
 
 func main() {
-	fs := flag.NewFlagSet("agentpet-client", flag.ExitOnError)
-	port := fs.Int("p", 0, "MCP server port")
-	verbose := fs.Bool("v", false, "verbose output")
-	fs.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: agentpet-client -p <port> [-v] <subcommand> [args]\n\n")
-		fmt.Fprintf(os.Stderr, "Subcommands:\n")
-		fmt.Fprintf(os.Stderr, "  animation [name]       change to the named animation, or a random one if omitted\n")
-		fmt.Fprintf(os.Stderr, "  pet <name> [animation] switch to a different pet, optionally activating an animation\n")
-		fmt.Fprintf(os.Stderr, "  pets                   list available pets and their animations\n")
-		fmt.Fprintf(os.Stderr, "  show                   show the pet window\n")
-		fmt.Fprintf(os.Stderr, "  hide                   hide the pet window\n\n")
-		fs.PrintDefaults()
+	a, err := parse(os.Args[1:], os.Stderr)
+	if errors.Is(err, flag.ErrHelp) {
+		os.Exit(0)
 	}
-	if err := fs.Parse(os.Args[1:]); err != nil {
-		os.Exit(2)
-	}
-	if *port == 0 {
-		fmt.Fprintln(os.Stderr, "error: -p <port> is required")
-		fs.Usage()
+	if err != nil {
 		os.Exit(2)
 	}
 
-	args := fs.Args()
-	if len(args) == 0 {
-		fs.Usage()
-		os.Exit(2)
-	}
-
-	endpoint := fmt.Sprintf("http://localhost:%d/", *port)
+	endpoint := fmt.Sprintf("http://localhost:%d/", a.Port)
 	transport := &mcp.StreamableClientTransport{
 		Endpoint:             endpoint,
 		DisableStandaloneSSE: true,
@@ -57,21 +38,17 @@ func main() {
 	defer session.Close()
 
 	var runErr error
-	switch args[0] {
+	switch a.Command {
 	case "animation":
-		runErr = cmdAnimation(ctx, session, args[1:], *verbose)
+		runErr = cmdAnimation(ctx, session, a.Rest, a.Verbose)
 	case "pet":
-		runErr = cmdPet(ctx, session, args[1:], *verbose)
+		runErr = cmdPet(ctx, session, a.Rest, a.Verbose)
 	case "pets":
-		runErr = cmdPets(ctx, session, *verbose)
+		runErr = cmdPets(ctx, session, a.Verbose)
 	case "show":
-		runErr = cmdWindow(ctx, session, "show_window", *verbose)
+		runErr = cmdWindow(ctx, session, "show_window", a.Verbose)
 	case "hide":
-		runErr = cmdWindow(ctx, session, "hide_window", *verbose)
-	default:
-		fmt.Fprintf(os.Stderr, "error: unknown subcommand %q\n", args[0])
-		fs.Usage()
-		os.Exit(2)
+		runErr = cmdWindow(ctx, session, "hide_window", a.Verbose)
 	}
 	if runErr != nil {
 		fmt.Fprintln(os.Stderr, "error:", runErr)
