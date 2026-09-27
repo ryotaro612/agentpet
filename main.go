@@ -9,6 +9,7 @@ import (
 	"github.com/ryotaro612/agentpet/internal/config"
 	"github.com/ryotaro612/agentpet/internal/server"
 	"github.com/ryotaro612/agentpet/internal/view"
+	"github.com/webview/webview"
 )
 
 func main() {
@@ -32,7 +33,7 @@ func main() {
 		logger.Warn("failed to start config watcher", "err", err)
 	}
 
-	v, err := view.New(logger)
+	v, err := view.New(view.NewWebviewAdapter(webview.New(false)), logger)
 	if err != nil {
 		logger.Error("failed to create view", "err", err)
 		os.Exit(1)

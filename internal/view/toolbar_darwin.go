@@ -152,6 +152,7 @@ func SetupWindow(window unsafe.Pointer) {
 	C.setupWindow(window)
 }
 
+
 func PreventTerminateOnHide() {
 	C.preventTerminateOnHide()
 }

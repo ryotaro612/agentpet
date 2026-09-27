@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/ryotaro612/agentpet/internal/pet"
-	"github.com/webview/webview"
 )
 
 //go:embed view.html
@@ -17,7 +16,7 @@ var viewHTMLSrc string
 
 // View wraps the native webview window and drives spritesheet animations.
 type View struct {
-	w           webview.WebView
+	w           internalView
 	animCh      chan pet.Animation
 	logger      *slog.Logger
 	htmlPath    string
@@ -26,7 +25,7 @@ type View struct {
 	currentAnim string
 }
 
-func New(logger *slog.Logger) (*View, error) {
+func New(w internalView, logger *slog.Logger) (*View, error) {
 	f, err := os.CreateTemp("", "agentpet-*.html")
 	if err != nil {
 		return nil, fmt.Errorf("view: failed to create temp HTML file: %w", err)
@@ -38,8 +37,6 @@ func New(logger *slog.Logger) (*View, error) {
 	}
 	f.Close()
 
-	w := webview.New(false)
-	PreventTerminateOnHide()
 	v := &View{
 		w:        w,
 		animCh:   make(chan pet.Animation, 1),
@@ -47,16 +44,16 @@ func New(logger *slog.Logger) (*View, error) {
 		htmlPath: f.Name(),
 	}
 
-	win := w.Window()
-	SetupWindow(win)
-	PreventHide(win)
-	SetupQuit()
+	v.w.PreventTerminateOnHide()
+	v.w.SetUpWIndow()
+	v.w.PreventHide()
+	v.w.SetupQuit()
 
-	w.Bind("moveWindow", func(dx, dy float64) {
-		MoveWindow(win, dx, dy)
+	v.w.Bind("moveWindow", func(dx, dy float64) {
+		v.w.MoveWindow(dx, dy)
 	})
 
-	w.Navigate("file://" + f.Name())
+	v.w.Navigate("file://" + f.Name())
 	return v, nil
 }
 
@@ -82,20 +79,12 @@ func (v *View) Current() (petName, animName string) {
 
 // ShowWindow brings the pet window to the front.
 func (v *View) ShowWindow() {
-	if v.w == nil {
-		return
-	}
-	win := v.w.Window()
-	v.w.Dispatch(func() { ShowWindow(win) })
+	v.w.SHowWindow()
 }
 
 // HideWindow hides the pet window.
 func (v *View) HideWindow() {
-	if v.w == nil {
-		return
-	}
-	win := v.w.Window()
-	v.w.Dispatch(func() { HideWindow(win) })
+	v.w.HideWindow()
 }
 
 // Noop returns a View that accepts method calls without doing anything.
@@ -137,10 +126,10 @@ func (v *View) dispatch(ctx context.Context, readyCh <-chan struct{}) {
 			v.w.Dispatch(func() {
 				win := anim.Window()
 				if !shown {
-					SetWindowSize(v.w.Window(), win.Width, win.Height)
+					v.w.SetWindowSize(win.Width, win.Height)
 					shown = true
 				} else {
-					ResizeWindowKeepingPosition(v.w.Window(), win.Width, win.Height)
+					v.w.ResizeWindowKeepingPosition(win.Width, win.Height)
 				}
 				fps, fpsErr := anim.CalcFps()
 				if fpsErr != nil {
