@@ -25,7 +25,7 @@ func defaultConfigPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".agentpet", "config.toml"), nil
+	return filepath.Join(home, ".local", "agentpet", "config.toml"), nil
 }
 
 func ParseArgs() (args, error) {

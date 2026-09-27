@@ -17,7 +17,7 @@ func TestDefaultConfigPath(t *testing.T) {
 		name string
 		want string
 	}{
-		{"returns a path rooted at the user home directory", filepath.Join(home, ".agentpet", "config.toml")},
+		{"returns a path rooted at the user home directory", filepath.Join(home, ".local", "agentpet", "config.toml")},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
