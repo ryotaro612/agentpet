@@ -21,10 +21,6 @@ type Animation struct {
 	window      Dimension
 }
 
-type Dimension struct {
-	Width  int
-	Height int
-}
 
 func (a Animation) live() error {
 	_, err := a.imageSize()
@@ -65,17 +61,13 @@ func (a Animation) imageSize() (Dimension, error) {
 // aspect ratio. If both are configured, the frame is scaled to fill the
 // window (preserving aspect ratio), and the window is shrunk to that size.
 func (a Animation) Window() Dimension {
-	w, h := a.window.Width, a.window.Height
 	switch {
-	case w > 0 && h > 0:
-		scaleW := float64(w) / float64(a.Frame.Width)
-		scaleH := float64(h) / float64(a.Frame.Height)
-		scale := min(scaleW, scaleH)
-		return Dimension{Width: int(float64(a.Frame.Width) * scale), Height: int(float64(a.Frame.Height) * scale)}
-	case w > 0:
-		return Dimension{Width: w, Height: w * a.Frame.Height / a.Frame.Width}
-	case h > 0:
-		return Dimension{Width: h * a.Frame.Width / a.Frame.Height, Height: h}
+	case a.window.Complete():
+		return a.Frame.ScaleTo(a.window)
+	case a.window.Width > 0:
+		return a.Frame.WithWidth(a.window.Width)
+	case a.window.Height > 0:
+		return a.Frame.WithHeight(a.window.Height)
 	default:
 		return a.Frame
 	}

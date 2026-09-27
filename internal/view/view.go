@@ -2,11 +2,11 @@ package view
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"log/slog"
 	"os"
 	"sync"
-	_ "embed"
 
 	"github.com/ryotaro612/agentpet/internal/pet"
 	"github.com/webview/webview"
@@ -17,10 +17,10 @@ var viewHTMLSrc string
 
 // View wraps the native webview window and drives spritesheet animations.
 type View struct {
-	w        webview.WebView
-	animCh   chan pet.Animation
-	logger   *slog.Logger
-	htmlPath string
+	w           webview.WebView
+	animCh      chan pet.Animation
+	logger      *slog.Logger
+	htmlPath    string
 	stateMu     sync.RWMutex
 	currentPet  string
 	currentAnim string
