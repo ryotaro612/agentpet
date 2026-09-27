@@ -19,12 +19,8 @@ var viewHTMLSrc string
 type View struct {
 	w        webview.WebView
 	animCh   chan pet.Animation
-	readyCh  chan struct{}
 	logger   *slog.Logger
 	htmlPath string
-	// shown is set after the first animation is displayed and is accessed only
-	// from Dispatch callbacks, which run on the webview main thread.
-	shown       bool
 	stateMu     sync.RWMutex
 	currentPet  string
 	currentAnim string
@@ -42,13 +38,11 @@ func New(logger *slog.Logger) (*View, error) {
 	}
 	f.Close()
 
-	readyCh := make(chan struct{})
 	w := webview.New(false)
 	PreventTerminateOnHide()
 	v := &View{
 		w:        w,
 		animCh:   make(chan pet.Animation, 1),
-		readyCh:  readyCh,
 		logger:   logger,
 		htmlPath: f.Name(),
 	}
@@ -60,11 +54,6 @@ func New(logger *slog.Logger) (*View, error) {
 
 	w.Bind("moveWindow", func(dx, dy float64) {
 		MoveWindow(win, dx, dy)
-	})
-
-	var once sync.Once
-	w.Bind("_viewReady", func() {
-		once.Do(func() { close(readyCh) })
 	})
 
 	w.Navigate("file://" + f.Name())
@@ -120,7 +109,12 @@ func Noop() *View {
 func (v *View) Run(ctx context.Context) {
 	defer os.Remove(v.htmlPath)
 	defer v.w.Destroy()
-	go v.dispatch(ctx)
+	readyCh := make(chan struct{})
+	var once sync.Once
+	v.w.Bind("_viewReady", func() {
+		once.Do(func() { close(readyCh) })
+	})
+	go v.dispatch(ctx, readyCh)
 	go func() {
 		<-ctx.Done()
 		v.w.Dispatch(func() { v.w.Terminate() })
@@ -128,12 +122,13 @@ func (v *View) Run(ctx context.Context) {
 	v.w.Run()
 }
 
-func (v *View) dispatch(ctx context.Context) {
+func (v *View) dispatch(ctx context.Context, readyCh <-chan struct{}) {
 	select {
-	case <-v.readyCh:
+	case <-readyCh:
 	case <-ctx.Done():
 		return
 	}
+	shown := false
 	for {
 		select {
 		case <-ctx.Done():
@@ -142,9 +137,9 @@ func (v *View) dispatch(ctx context.Context) {
 			v.w.Dispatch(func() {
 				window, displayFrame := anim.Layout()
 				if window.NonZero() {
-					if !v.shown {
+					if !shown {
 						SetWindowSize(v.w.Window(), window.Width, window.Height)
-						v.shown = true
+						shown = true
 					} else {
 						ResizeWindowKeepingPosition(v.w.Window(), window.Width, window.Height)
 					}
