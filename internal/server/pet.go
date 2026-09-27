@@ -38,7 +38,7 @@ func changePetTool(petName string, s *server) (changePetMcpTool, bool) {
 				return nil, nil, err
 			}
 			s.mu.Lock()
-			currentPet, _ := s.v.Current()
+			currentPet := s.v.Current().Pet
 			oldAnimTools := playAnimationTools(currentPet, s).names()
 			s.registerTools(input.Name, oldAnimTools)
 			s.mu.Unlock()

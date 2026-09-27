@@ -64,7 +64,7 @@ func (s *server) onConfigChange(cfg config.Config) {
 	petName := k.DefaultPet()
 	anim := k.DefaultAnim(petName)
 	s.mu.Lock()
-	currentPet, _ := s.v.Current()
+	currentPet := s.v.Current().Pet
 	oldAnimTools := playAnimationTools(currentPet, s).names()
 	s.k = k
 	s.registerTools(petName, oldAnimTools)

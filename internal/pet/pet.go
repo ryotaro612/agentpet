@@ -15,12 +15,11 @@ import (
 type Animation struct {
 	filePath    string
 	fps         int
-	Frame       Dimension
+	frame       Dimension
 	Name        string
 	Description string
 	window      Dimension
 }
-
 
 func (a Animation) live() error {
 	_, err := a.imageSize()
@@ -61,16 +60,7 @@ func (a Animation) imageSize() (Dimension, error) {
 // aspect ratio. If both are configured, the frame is scaled to fill the
 // window (preserving aspect ratio), and the window is shrunk to that size.
 func (a Animation) Window() Dimension {
-	switch {
-	case a.window.Complete():
-		return a.Frame.ScaleTo(a.window)
-	case a.window.Width > 0:
-		return a.Frame.WithWidth(a.window.Width)
-	case a.window.Height > 0:
-		return a.Frame.WithHeight(a.window.Height)
-	default:
-		return a.Frame
-	}
+	return a.window.Constrain(a.frame)
 }
 
 // DisplayFrame returns the dimensions at which each spritesheet frame is
@@ -81,7 +71,7 @@ func (a Animation) DisplayFrame() Dimension {
 
 // FrameSize returns the spritesheet frame dimensions.
 func (a Animation) FrameSize() Dimension {
-	return a.Frame
+	return a.frame
 }
 
 // CalcFps returns a.fps when set, otherwise infers fps from the number of
@@ -91,17 +81,17 @@ func (a Animation) CalcFps() (int, error) {
 	if a.fps > 0 {
 		return a.fps, nil
 	}
-	if a.Frame.Width == 0 || a.Frame.Height == 0 {
+	if !a.frame.Complete() {
 		return 0, fmt.Errorf("frame dimensions not set")
 	}
 	img, err := a.imageSize()
 	if err != nil {
 		return 0, err
 	}
-	n := (img.Width / a.Frame.Width) * (img.Height / a.Frame.Height)
+	n := (img.Width / a.frame.Width) * (img.Height / a.frame.Height)
 	if n == 0 {
 		return 0, fmt.Errorf("computed zero frames from image %dx%d with frame %dx%d",
-			img.Width, img.Height, a.Frame.Width, a.Frame.Height)
+			img.Width, img.Height, a.frame.Width, a.frame.Height)
 	}
 	return n, nil
 }
@@ -110,7 +100,7 @@ func resolveAnimation(a config.AnimationConfig, p config.PetConfig, cfg config.C
 	return Animation{
 		filePath: a.File,
 		fps:      coalesce(a.FPS, p.FPS, cfg.FPS),
-		Frame: Dimension{
+		frame: Dimension{
 			Height: coalesce(a.Frame.Height, p.Frame.Height, cfg.Frame.Height),
 			Width:  coalesce(a.Frame.Width, p.Frame.Width, cfg.Frame.Width),
 		},

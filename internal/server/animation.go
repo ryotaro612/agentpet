@@ -19,7 +19,7 @@ func playAnimationTools(petName string, s *server) mcpTools {
 		tools = append(tools, mcpTool{
 			tool: mcp.Tool{Name: name, Description: desc},
 			handler: func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-				currentPet, _ := s.v.Current()
+				currentPet := s.v.Current().Pet
 				s.mu.RLock()
 				k := s.k
 				s.mu.RUnlock()

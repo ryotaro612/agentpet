@@ -17,7 +17,7 @@ func listPetsTool(k pet.Keeper, v *view.View) mcpTool {
 		},
 		handler: func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
 			allPets := k.AllPets()
-			currentPet, currentAnim := v.Current()
+			state := v.Current()
 
 			type activeEntry struct {
 				Pet       string `json:"pet"`
@@ -50,7 +50,7 @@ func listPetsTool(k pet.Keeper, v *view.View) mcpTool {
 				pets = append(pets, petEntry{Name: p.Name, Animations: anims})
 			}
 			b, err := json.Marshal(response{
-				Active: activeEntry{Pet: currentPet, Animation: currentAnim},
+				Active: activeEntry{Pet: state.Pet, Animation: state.Animation},
 				Pets:   pets,
 			})
 			if err != nil {

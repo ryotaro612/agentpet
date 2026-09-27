@@ -14,6 +14,12 @@ import (
 //go:embed view.html
 var viewHTMLSrc string
 
+// State holds the pet name and animation name that are currently displayed.
+type State struct {
+	Pet       string
+	Animation string
+}
+
 // View wraps the native webview window and drives spritesheet animations.
 type View struct {
 	w           internalView
@@ -70,11 +76,11 @@ func (v *View) Show(petName string, anim pet.Animation) {
 	}
 }
 
-// Current returns the pet name and animation name that were most recently shown.
-func (v *View) Current() (petName, animName string) {
+// Current returns the pet and animation that were most recently shown.
+func (v *View) Current() State {
 	v.stateMu.RLock()
 	defer v.stateMu.RUnlock()
-	return v.currentPet, v.currentAnim
+	return State{Pet: v.currentPet, Animation: v.currentAnim}
 }
 
 // ShowWindow brings the pet window to the front.
