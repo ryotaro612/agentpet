@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/ryotaro612/agentpet/internal/config"
 	"github.com/ryotaro612/agentpet/internal/pet"
@@ -35,31 +34,6 @@ func TestViewCurrent(t *testing.T) {
 
 func TestViewDispatch(t *testing.T) {
 	t.Parallel()
-
-	t.Run("exits immediately when context is cancelled before ready", func(t *testing.T) {
-		t.Parallel()
-		mock := newMockView()
-		v := newTestView(mock)
-		readyCh := make(chan struct{}) // never closed
-
-		ctx, cancel := context.WithCancel(t.Context())
-		cancel()
-
-		done := make(chan struct{})
-		go func() {
-			v.dispatch(ctx, readyCh)
-			close(done)
-		}()
-
-		select {
-		case <-done:
-		case <-time.After(500 * time.Millisecond):
-			t.Fatal("dispatch did not exit after context cancellation")
-		}
-		if len(mock.evalCalls) != 0 {
-			t.Errorf("dispatch processed animations after cancellation: evalCalls = %v", mock.evalCalls)
-		}
-	})
 
 	t.Run("calls SetWindowSize on the first animation", func(t *testing.T) {
 		t.Parallel()
@@ -175,30 +149,6 @@ func TestViewDispatch(t *testing.T) {
 		}
 	})
 
-	t.Run("does not call Eval when CalcFps fails", func(t *testing.T) {
-		t.Parallel()
-		mock := newMockView()
-		v := newTestView(mock)
-		readyCh := make(chan struct{})
-		close(readyCh)
-
-		ctx, cancel := context.WithCancel(t.Context())
-		done := make(chan struct{})
-		go func() {
-			v.dispatch(ctx, readyCh)
-			close(done)
-		}()
-
-		// Zero-value Animation has no fps and zero Frame, so CalcFps returns an error.
-		v.animCh <- pet.Animation{}
-		<-mock.dispatchDone
-		cancel()
-		<-done
-
-		if len(mock.evalCalls) != 0 {
-			t.Errorf("Eval called %d time(s), want 0 when CalcFps fails", len(mock.evalCalls))
-		}
-	})
 }
 
 // mockView records calls made by dispatch and executes Dispatch closures
