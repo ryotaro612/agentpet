@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
@@ -17,11 +16,6 @@ import (
 	"github.com/ryotaro612/agentpet/internal/pet"
 	"github.com/ryotaro612/agentpet/internal/view"
 )
-
-type changePetInput struct {
-	Name      string `json:"name"`
-	Animation string `json:"animation"`
-}
 
 type server struct {
 	cfgCh     <-chan config.Config
@@ -59,108 +53,26 @@ func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Co
 	hide := hideWindowTool(s.v)
 	mcp.AddTool(s.mcpServer, &hide.tool, hide.handler)
 	petName := k.DefaultPet()
-	anim, _ := k.DefaultAnim(petName)
+	anim := k.DefaultAnim(petName)
 	s.registerTools(petName, nil)
 	s.v.Show(petName, anim)
 	return &s, nil
 }
 
-func buildChangePetSchema(petNames []string) json.RawMessage {
-	b, _ := json.Marshal(map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"name": map[string]any{
-				"type":        "string",
-				"description": "Name of the pet to switch to",
-				"enum":        petNames,
-			},
-			"animation": map[string]any{
-				"type":        "string",
-				"description": "Name of the animation to activate on the new pet",
-			},
-		},
-		"required": []string{"name"},
-	})
-	return json.RawMessage(b)
-}
-
-func (s *server) animToolNames(petName string) []string {
-	anims := s.k.Animations(petName)
-	names := make([]string, len(anims))
-	for i, a := range anims {
-		names[i] = "play_" + a.Name
-	}
-	return names
-}
-
-// registerTools must be called with s.mu held for writing.
-func (s *server) registerTools(petName string, oldAnimTools []string) {
-	lp := listPetsTool(s.k, s.v)
-	s.mcpServer.RemoveTools(append(oldAnimTools, "change_pet", lp.toolName())...)
-	mcp.AddTool(s.mcpServer, &lp.tool, lp.handler)
-
-	for _, a := range s.k.Animations(petName) {
-		toolName := "play_" + a.Name
-		desc := a.Description
-		if desc == "" {
-			desc = "Play the " + a.Name + " animation"
-		}
-		animName := a.Name
-		mcp.AddTool(s.mcpServer, &mcp.Tool{
-			Name:        toolName,
-			Description: desc,
-		}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
-			currentPet, _ := s.v.Current()
-			s.mu.RLock()
-			k := s.k
-			s.mu.RUnlock()
-			anim, err := k.PlayAnimation(currentPet, animName)
-			if err != nil {
-				return nil, nil, err
-			}
-			s.v.Show(currentPet, anim)
-			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Playing " + animName}}}, nil, nil
-		})
-	}
-
-	if otherPets := s.k.OtherPetNames(petName); len(otherPets) > 0 {
-		mcp.AddTool(s.mcpServer, &mcp.Tool{
-			Name:        "change_pet",
-			Description: "Switch the active pet",
-			InputSchema: buildChangePetSchema(otherPets),
-		}, func(_ context.Context, _ *mcp.CallToolRequest, input changePetInput) (*mcp.CallToolResult, any, error) {
-			s.mu.RLock()
-			k := s.k
-			s.mu.RUnlock()
-			anim, err := k.ChangePet(input.Name, input.Animation)
-			if err != nil {
-				return nil, nil, err
-			}
-			s.mu.Lock()
-			currentPet, _ := s.v.Current()
-			oldAnimTools := s.animToolNames(currentPet)
-			s.registerTools(input.Name, oldAnimTools)
-			s.mu.Unlock()
-			s.v.Show(input.Name, anim)
-			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "Switched to " + input.Name}}}, nil, nil
-		})
-	}
-}
-
 func (s *server) onConfigChange(cfg config.Config) {
 	k := pet.NewKeeper(cfg)
 	petName := k.DefaultPet()
-	anim, _ := k.DefaultAnim(petName)
+	anim := k.DefaultAnim(petName)
 	s.mu.Lock()
 	currentPet, _ := s.v.Current()
-	oldAnimTools := s.animToolNames(currentPet)
+	oldAnimTools := playAnimationTools(currentPet, s).names()
 	s.k = k
 	s.registerTools(petName, oldAnimTools)
 	s.mu.Unlock()
 	s.v.Show(petName, anim)
 }
 
-func (s *server) Run(ctx context.Context) {
+func (s *server) Run(ctx context.Context) error {
 	defer s.cancel()
 
 	mux := http.NewServeMux()
@@ -170,14 +82,11 @@ func (s *server) Run(ctx context.Context) {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
-outer:
 	for {
 		ln, err := s.availablePort()
 		if err != nil {
-			s.logger.Error("failed to listen", "err", err)
-			return
+			return fmt.Errorf("failed to listen: %w", err)
 		}
-
 		s.logger.Info("MCP server listening", "addr", ln.Addr().String())
 
 		httpSrv := &http.Server{Handler: mux}
@@ -189,36 +98,44 @@ outer:
 			}
 		}()
 
-		for {
-			select {
-			case <-ctx.Done():
+		if !s.serveHTTP(ctx, httpSrv, srvDone, sigCh) {
+			return nil
+		}
+	}
+}
+
+// serveHTTP handles events for one HTTP server instance. It returns true when
+// the caller should restart with a new listener (port change), false to stop.
+func (s *server) serveHTTP(ctx context.Context, httpSrv *http.Server, srvDone <-chan struct{}, sigCh <-chan os.Signal) bool {
+	for {
+		select {
+		case <-ctx.Done():
+			httpSrv.Shutdown(context.Background())
+			<-srvDone
+			return false
+		case <-sigCh:
+			s.cancel()
+			httpSrv.Shutdown(context.Background())
+			<-srvDone
+			return false
+		case cfg, ok := <-s.cfgCh:
+			if !ok {
 				httpSrv.Shutdown(context.Background())
 				<-srvDone
-				return
-			case <-sigCh:
-				s.cancel()
+				return false
+			}
+			s.mu.RLock()
+			activePort := s.port
+			s.mu.RUnlock()
+			s.onConfigChange(cfg)
+			if cfg.Port != 0 && cfg.Port != activePort {
 				httpSrv.Shutdown(context.Background())
 				<-srvDone
-				return
-			case cfg, ok := <-s.cfgCh:
-				if !ok {
-					httpSrv.Shutdown(context.Background())
-					<-srvDone
-					return
-				}
-				s.mu.RLock()
-				activePort := s.port
-				s.mu.RUnlock()
-				s.onConfigChange(cfg)
-				if cfg.Port != 0 && cfg.Port != activePort {
-					httpSrv.Shutdown(context.Background())
-					<-srvDone
-					s.mu.Lock()
-					s.port = cfg.Port
-					s.mu.Unlock()
-					s.logger.Info("MCP server restarting", "port", cfg.Port)
-					continue outer
-				}
+				s.mu.Lock()
+				s.port = cfg.Port
+				s.mu.Unlock()
+				s.logger.Info("MCP server restarting", "port", cfg.Port)
+				return true
 			}
 		}
 	}

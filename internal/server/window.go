@@ -16,6 +16,32 @@ func (t mcpTool) toolName() string {
 	return t.tool.Name
 }
 
+type mcpTools []mcpTool
+
+func (ts mcpTools) names() []string {
+	names := make([]string, len(ts))
+	for i, t := range ts {
+		names[i] = t.toolName()
+	}
+	return names
+}
+
+// registerTools must be called with s.mu held for writing.
+func (s *server) registerTools(petName string, oldAnimTools []string) {
+	lp := listPetsTool(s.k, s.v)
+	s.mcpServer.RemoveTools(append(oldAnimTools, "change_pet", lp.toolName())...)
+	mcp.AddTool(s.mcpServer, &lp.tool, lp.handler)
+
+	animTools := playAnimationTools(petName, s)
+	for i := range animTools {
+		mcp.AddTool(s.mcpServer, &animTools[i].tool, animTools[i].handler)
+	}
+
+	if t, ok := changePetTool(petName, s); ok {
+		mcp.AddTool(s.mcpServer, &t.tool, t.handler)
+	}
+}
+
 func showWindowTool(v *view.View) mcpTool {
 	return newWindowTool("show_window", "Show the pet window", v.ShowWindow, "Window is now visible")
 }

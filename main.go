@@ -38,6 +38,10 @@ func main() {
 		logger.Error("failed to create server", "err", err)
 		os.Exit(1)
 	}
-	go s.Run(ctx)
+	go func() {
+		if err := s.Run(ctx); err != nil {
+			logger.Debug("server stopped", "err", err)
+		}
+	}()
 	v.Run(ctx)
 }

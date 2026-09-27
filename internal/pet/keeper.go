@@ -7,14 +7,14 @@ import (
 )
 
 type Keeper struct {
-	pets             map[string][]Animation
-	pet              string
+	pets              map[string][]Animation
+	pet               string
 	defaultAnimations map[string]string
 }
 
 func NewKeeper(cfg config.Config) Keeper {
 	k := Keeper{
-		pets:             buildPetsMap(cfg),
+		pets:              buildPetsMap(cfg),
 		defaultAnimations: make(map[string]string),
 	}
 	if _, ok := k.pets[cfg.Pet]; ok {
@@ -37,17 +37,14 @@ func (k Keeper) DefaultPet() string {
 	return k.pet
 }
 
-func (k Keeper) DefaultAnim(petName string) (Animation, bool) {
-	animName, ok := k.defaultAnimations[petName]
-	if !ok {
-		return Animation{}, false
-	}
+func (k Keeper) DefaultAnim(petName string) Animation {
+	animName := k.defaultAnimations[petName]
 	for _, a := range k.pets[petName] {
 		if a.Name == animName {
-			return a, true
+			return a
 		}
 	}
-	return Animation{}, false
+	return Animation{}
 }
 
 func (k Keeper) PlayAnimation(currentPet, name string) (Animation, error) {
