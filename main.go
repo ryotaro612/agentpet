@@ -32,7 +32,11 @@ func main() {
 		logger.Warn("failed to start config watcher", "err", err)
 	}
 
-	v := view.New(logger)
+	v, err := view.New(logger)
+	if err != nil {
+		logger.Error("failed to create view", "err", err)
+		os.Exit(1)
+	}
 	s, err := server.NewServer(cfgCh, v, cfg.Port, cfg, logger, cancel)
 	if err != nil {
 		logger.Error("failed to create server", "err", err)

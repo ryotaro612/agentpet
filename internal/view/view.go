@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 	"sync"
-	"text/template"
 	_ "embed"
 
 	"github.com/ryotaro612/agentpet/internal/pet"
@@ -32,19 +30,15 @@ type View struct {
 	currentAnim string
 }
 
-func New(logger *slog.Logger) *View {
-	tmpl := template.Must(template.New("view").Parse(viewHTMLSrc))
-	var buf strings.Builder
-	if err := tmpl.Execute(&buf, nil); err != nil {
-		panic("view: failed to render HTML template: " + err.Error())
-	}
-
+func New(logger *slog.Logger) (*View, error) {
 	f, err := os.CreateTemp("", "agentpet-*.html")
 	if err != nil {
-		panic("view: failed to create temp HTML file: " + err.Error())
+		return nil, fmt.Errorf("view: failed to create temp HTML file: %w", err)
 	}
-	if _, err := f.WriteString(buf.String()); err != nil {
-		panic("view: failed to write HTML: " + err.Error())
+	if _, err := f.WriteString(viewHTMLSrc); err != nil {
+		f.Close()
+		os.Remove(f.Name())
+		return nil, fmt.Errorf("view: failed to write HTML: %w", err)
 	}
 	f.Close()
 
@@ -74,7 +68,7 @@ func New(logger *slog.Logger) *View {
 	})
 
 	w.Navigate("file://" + f.Name())
-	return v
+	return v, nil
 }
 
 // Show records the current pet and animation, then queues the animation for
