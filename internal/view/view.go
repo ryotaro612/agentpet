@@ -136,13 +136,11 @@ func (v *View) dispatch(ctx context.Context, readyCh <-chan struct{}) {
 		case anim := <-v.animCh:
 			v.w.Dispatch(func() {
 				window, displayFrame := anim.Layout()
-				if window.NonZero() {
-					if !shown {
-						SetWindowSize(v.w.Window(), window.Width, window.Height)
-						shown = true
-					} else {
-						ResizeWindowKeepingPosition(v.w.Window(), window.Width, window.Height)
-					}
+				if !shown {
+					SetWindowSize(v.w.Window(), window.Width, window.Height)
+					shown = true
+				} else {
+					ResizeWindowKeepingPosition(v.w.Window(), window.Width, window.Height)
 				}
 				fps, fpsErr := anim.CalcFps()
 				if fpsErr != nil {
