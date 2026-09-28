@@ -8,6 +8,7 @@ import (
 	_ "image/png"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ryotaro612/agentpet/internal/config"
 )
@@ -27,11 +28,19 @@ func (a Animation) live() error {
 }
 
 func (a Animation) AbsFilePath() (string, error) {
-	return filepath.Abs(a.filePath)
+	p := a.filePath
+	if strings.HasPrefix(p, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		p = filepath.Join(home, p[2:])
+	}
+	return filepath.Abs(p)
 }
 
 func (a Animation) FileSchemaPath() (string, error) {
-	p, err := filepath.Abs(a.filePath)
+	p, err := a.AbsFilePath()
 	if err != nil {
 		return "", err
 	}

@@ -102,6 +102,23 @@ func TestAnimationFileSchemaPath(t *testing.T) {
 			t.Errorf("FileSchemaPath() = %q, want %q", got, want)
 		}
 	})
+
+	t.Run("expands ~/ to the home directory", func(t *testing.T) {
+		t.Parallel()
+		home, err := os.UserHomeDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		anim := Animation{filePath: "~/sprites/cat.png"}
+		got, err := anim.FileSchemaPath()
+		if err != nil {
+			t.Fatalf("FileSchemaPath() error = %v", err)
+		}
+		want := "file://" + filepath.Join(home, "sprites", "cat.png")
+		if got != want {
+			t.Errorf("FileSchemaPath() = %q, want %q", got, want)
+		}
+	})
 }
 
 func writePNG(t *testing.T, w, h int) string {
