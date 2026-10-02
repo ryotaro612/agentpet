@@ -144,6 +144,12 @@ func (v *View) dispatch(ctx context.Context, readyCh <-chan struct{}) {
 						"animation", anim.Name, "err", fpsErr)
 					return
 				}
+				count, countErr := anim.Count()
+				if countErr != nil {
+					v.logger.Warn("skipping animation: cannot compute frame count",
+						"animation", anim.Name, "err", countErr)
+					return
+				}
 				filePath, err := anim.FileSchemaPath()
 				if err != nil {
 					v.logger.Warn("skipping animation: cannot resolve path",
@@ -151,8 +157,8 @@ func (v *View) dispatch(ctx context.Context, readyCh <-chan struct{}) {
 					return
 				}
 				frame := anim.FrameSize()
-				v.w.Eval(fmt.Sprintf("showAnimation(%q, %d, %d, %d, %d, %d)",
-					filePath, fps, frame.Width, frame.Height, win.Width, win.Height))
+				v.w.Eval(fmt.Sprintf("showAnimation(%q, %d, %d, %d, %d, %d, %d)",
+					filePath, fps, frame.Width, frame.Height, win.Width, win.Height, count))
 			})
 		}
 	}

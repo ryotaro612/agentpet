@@ -21,14 +21,14 @@ canvas {
 <script>
 var animTimer = null;
 
-function showAnimation(src, fps, frameWidth, frameHeight, displayWidth, displayHeight) {
+function showAnimation(src, fps, frameWidth, frameHeight, displayWidth, displayHeight, count) {
   var canvas = document.getElementById('sprite');
   var ctx = canvas.getContext('2d');
   var img = new Image();
   img.onload = function() {
     var cols = Math.floor(img.width / frameWidth);
     var rows = Math.floor(img.height / frameHeight);
-    var frameCount = cols * rows;
+    var frameCount = count;
     canvas.width = displayWidth;
     canvas.height = displayHeight;
     var frame = 0;

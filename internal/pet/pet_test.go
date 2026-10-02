@@ -47,6 +47,58 @@ func TestAnimationWindow(t *testing.T) {
 	}
 }
 
+func TestAnimationCount(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns explicit count when set", func(t *testing.T) {
+		t.Parallel()
+		anim := Animation{count: 6, frame: Dimension{Width: 32, Height: 32}, window: Dimension{Width: 128, Height: 128}}
+		got, err := anim.Count()
+		if err != nil {
+			t.Fatalf("Count() error = %v", err)
+		}
+		if got != 6 {
+			t.Errorf("Count() = %d, want 6", got)
+		}
+	})
+
+	t.Run("computes count from window and frame area when count is not set", func(t *testing.T) {
+		t.Parallel()
+		// window 128×64, frame 32×32 → (128*64)/(32*32) = 8 frames
+		anim := Animation{frame: Dimension{Width: 32, Height: 32}, window: Dimension{Width: 128, Height: 64}}
+		got, err := anim.Count()
+		if err != nil {
+			t.Fatalf("Count() error = %v", err)
+		}
+		if got != 8 {
+			t.Errorf("Count() = %d, want 8", got)
+		}
+	})
+
+	t.Run("infers count from spritesheet when window is not configured", func(t *testing.T) {
+		t.Parallel()
+		// 64×32 image with 32×32 frames → 2 columns × 1 row = 2 frames
+		path := writePNG(t, 64, 32)
+		anim := Animation{filePath: path, frame: Dimension{Width: 32, Height: 32}}
+		got, err := anim.Count()
+		if err != nil {
+			t.Fatalf("Count() error = %v", err)
+		}
+		if got != 2 {
+			t.Errorf("Count() = %d, want 2", got)
+		}
+	})
+
+	t.Run("returns an error when window is not configured and image is not found", func(t *testing.T) {
+		t.Parallel()
+		anim := Animation{filePath: "nonexistent.png", frame: Dimension{Width: 32, Height: 32}}
+		if _, err := anim.Count(); err == nil {
+			t.Error("Count() = nil, want error")
+		}
+	})
+
+}
+
 func TestAnimationCalcFps(t *testing.T) {
 	t.Parallel()
 

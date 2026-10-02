@@ -53,23 +53,30 @@ func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Co
 	hide := hideWindowTool(s.v)
 	mcp.AddTool(s.mcpServer, &hide.tool, hide.handler)
 	petName := k.DefaultPet()
-	anim := k.DefaultAnim(petName)
 	s.registerTools(petName, nil)
-	s.v.Show(petName, anim)
+	if anim, ok := k.DefaultAnim(petName); ok {
+		s.v.Show(petName, anim)
+	} else {
+		s.logger.Warn("no default animation found", "pet", petName)
+	}
 	return &s, nil
 }
 
 func (s *server) onConfigChange(cfg config.Config) {
 	k := pet.NewKeeper(cfg)
 	petName := k.DefaultPet()
-	anim := k.DefaultAnim(petName)
+	anim, hasAnim := k.DefaultAnim(petName)
 	s.mu.Lock()
 	currentPet := s.v.CurrentPet()
 	oldAnimTools := playAnimationTools(currentPet, s).names()
 	s.k = k
 	s.registerTools(petName, oldAnimTools)
 	s.mu.Unlock()
-	s.v.Show(petName, anim)
+	if hasAnim {
+		s.v.Show(petName, anim)
+	} else {
+		s.logger.Warn("no default animation found", "pet", petName)
+	}
 }
 
 func (s *server) Run(ctx context.Context) error {

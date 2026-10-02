@@ -137,7 +137,7 @@ func TestViewDispatch(t *testing.T) {
 		if len(mock.ResizeWindowCalls) != 1 || mock.ResizeWindowCalls[0] != wantDim {
 			t.Errorf("window size on second play = %v, want [%v]", mock.ResizeWindowCalls, wantDim)
 		}
-		wantEval := fmt.Sprintf("showAnimation(%q, 2, 32, 32, 32, 32)", "file://"+absPath)
+		wantEval := fmt.Sprintf("showAnimation(%q, 2, 32, 32, 32, 32, 2)", "file://"+absPath)
 		for i, got := range mock.EvalCalls {
 			if got != wantEval {
 				t.Errorf("animation rendered on play %d = %q, want %q", i+1, got, wantEval)
@@ -156,12 +156,10 @@ func TestViewDispatch(t *testing.T) {
 func animForTest(fps int, frame pet.Dimension) pet.Animation {
 	anims := pet.NewKeeper(config.Config{
 		Pets: []config.PetConfig{{
-			Name: "test",
-			FPS:  fps,
-			Frame: config.DimensionConfig{
-				Width:  frame.Width,
-				Height: frame.Height,
-			},
+			Name:   "test",
+			FPS:    fps,
+			Frame:  config.DimensionConfig{Width: frame.Width, Height: frame.Height},
+			Window: config.DimensionConfig{Width: frame.Width, Height: frame.Height},
 			Animations: []config.AnimationConfig{{Name: "idle", File: "idle.png"}},
 		}},
 	}).Animations("test")

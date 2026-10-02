@@ -37,14 +37,14 @@ func (k Keeper) DefaultPet() string {
 	return k.pet
 }
 
-func (k Keeper) DefaultAnim(petName string) Animation {
+func (k Keeper) DefaultAnim(petName string) (Animation, bool) {
 	animName := k.defaultAnimations[petName]
 	for _, a := range k.pets[petName] {
 		if a.Name == animName {
-			return a
+			return a, true
 		}
 	}
-	return Animation{}
+	return Animation{}, false
 }
 
 func (k Keeper) PlayAnimation(currentPet, name string) (Animation, error) {

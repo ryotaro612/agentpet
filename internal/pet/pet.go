@@ -16,6 +16,7 @@ import (
 type Animation struct {
 	filePath    string
 	fps         int
+	count       int
 	frame       Dimension
 	Name        string
 	Description string
@@ -83,12 +84,16 @@ func (a Animation) FrameSize() Dimension {
 	return a.frame
 }
 
-// CalcFps returns a.fps when set, otherwise infers fps from the number of
-// frames in the spritesheet (cols × rows) so one full cycle takes one second.
-// Returns an error when the animation's fields are insufficient to compute fps.
-func (a Animation) CalcFps() (int, error) {
-	if a.fps > 0 {
-		return a.fps, nil
+// Count returns the number of frames to cycle through. When an explicit count
+// is configured it is returned as-is. When both window and frame dimensions are
+// set, the count is derived from their area ratio. Otherwise the spritesheet
+// image is read and the count is inferred from its dimensions.
+func (a Animation) Count() (int, error) {
+	if a.count > 0 {
+		return a.count, nil
+	}
+	if a.frame.Complete() && a.window.Complete() {
+		return a.window.Tiles(a.frame), nil
 	}
 	if !a.frame.Complete() {
 		return 0, fmt.Errorf("frame dimensions not set")
@@ -97,7 +102,7 @@ func (a Animation) CalcFps() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	n := (img.Width / a.frame.Width) * (img.Height / a.frame.Height)
+	n := img.Tiles(a.frame)
 	if n == 0 {
 		return 0, fmt.Errorf("computed zero frames from image %dx%d with frame %dx%d",
 			img.Width, img.Height, a.frame.Width, a.frame.Height)
@@ -105,10 +110,20 @@ func (a Animation) CalcFps() (int, error) {
 	return n, nil
 }
 
+// CalcFps returns a.fps when set, otherwise delegates to Count so one full
+// cycle takes one second.
+func (a Animation) CalcFps() (int, error) {
+	if a.fps > 0 {
+		return a.fps, nil
+	}
+	return a.Count()
+}
+
 func resolveAnimation(a config.AnimationConfig, p config.PetConfig, cfg config.Config) Animation {
 	return Animation{
 		filePath: a.File,
 		fps:      coalesce(a.FPS, p.FPS, cfg.FPS),
+		count:    coalesce(a.Frame.Count, cfg.Frame.Count),
 		frame: Dimension{
 			Height: coalesce(a.Frame.Height, p.Frame.Height, cfg.Frame.Height),
 			Width:  coalesce(a.Frame.Width, p.Frame.Width, cfg.Frame.Width),

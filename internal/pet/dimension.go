@@ -32,6 +32,11 @@ func (d Dimension) WithHeight(h int) Dimension {
 	return Dimension{Width: h * d.Width / d.Height, Height: h}
 }
 
+// Tiles returns the number of non-overlapping frame-sized cells that fit in d.
+func (d Dimension) Tiles(frame Dimension) int {
+	return (d.Width / frame.Width) * (d.Height / frame.Height)
+}
+
 // Constrain scales frame to fit within d while preserving frame's aspect ratio.
 // When only one axis of d is set, that axis drives the scale. When d is zero,
 // frame is returned unchanged.
