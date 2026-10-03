@@ -67,6 +67,16 @@ func TestParse(t *testing.T) {
 			argv: []string{"-p", "8080", "vet"},
 			want: parsedArgs{port: 8080, command: "vet"},
 		},
+		{
+			name: "parses zsh completion without a port",
+			argv: []string{"completion", "zsh"},
+			want: parsedArgs{command: "completion", completion: completionArgs{shell: "zsh"}},
+		},
+		{
+			name:    "returns an error for an unsupported completion shell",
+			argv:    []string{"completion", "bash"},
+			wantErr: "usage: petowner completion zsh",
+		},
 	}
 
 	for _, c := range cases {

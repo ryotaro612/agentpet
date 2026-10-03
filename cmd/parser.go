@@ -7,17 +7,22 @@ import (
 )
 
 const (
-	appName    = "petowner"
-	subcmdAnim = "animation"
-	subcmdPet  = "pet"
-	subcmdPets = "pets"
-	subcmdShow = "show"
-	subcmdHide = "hide"
-	subcmdVet  = "vet"
+	appName          = "petowner"
+	subcmdAnim       = "animation"
+	subcmdCompletion = "completion"
+	subcmdPet        = "pet"
+	subcmdPets       = "pets"
+	subcmdShow       = "show"
+	subcmdHide       = "hide"
+	subcmdVet        = "vet"
 )
 
 type animationArgs struct {
 	animation string
+}
+
+type completionArgs struct {
+	shell string
 }
 
 type petArgs struct {
@@ -27,11 +32,12 @@ type petArgs struct {
 }
 
 type parsedArgs struct {
-	port      int
-	command   string
-	verbose   bool
-	animation animationArgs
-	pet       petArgs
+	port       int
+	command    string
+	verbose    bool
+	animation  animationArgs
+	completion completionArgs
+	pet        petArgs
 }
 
 func parse(argv []string, output io.Writer) (parsedArgs, error) {
@@ -46,6 +52,7 @@ func parse(argv []string, output io.Writer) (parsedArgs, error) {
 	verbose := fs.Bool("v", false, "verbose output")
 
 	animationCmd := newFlagSet(subcmdAnim)
+	completionCmd := newFlagSet(subcmdCompletion)
 	petCmd := newFlagSet(subcmdPet)
 	petsCmd := newFlagSet(subcmdPets)
 	showCmd := newFlagSet(subcmdShow)
@@ -58,6 +65,7 @@ func parse(argv []string, output io.Writer) (parsedArgs, error) {
 		fs.PrintDefaults()
 		fmt.Fprintf(output, "\nSubcommands:\n")
 		fmt.Fprintf(output, "  %s [name]\n", subcmdAnim)
+		fmt.Fprintf(output, "  %s zsh\n", subcmdCompletion)
 		fmt.Fprintf(output, "  %s <name> [animation]\n", subcmdPet)
 		fmt.Fprintf(output, "  %s\n", subcmdPets)
 		fmt.Fprintf(output, "  %s\n", subcmdShow)
@@ -68,12 +76,6 @@ func parse(argv []string, output io.Writer) (parsedArgs, error) {
 	if err := fs.Parse(argv); err != nil {
 		return parsedArgs{}, err
 	}
-	if *port == 0 {
-		fmt.Fprintln(output, "error: -p <port> is required")
-		fs.Usage()
-		return parsedArgs{}, fmt.Errorf("-p <port> is required")
-	}
-
 	rest := fs.Args()
 	if len(rest) == 0 {
 		fmt.Fprintln(output, "error: subcommand is required")
@@ -84,6 +86,11 @@ func parse(argv []string, output io.Writer) (parsedArgs, error) {
 	cmd := rest[0]
 	subArgs := rest[1:]
 	result := parsedArgs{port: *port, command: cmd, verbose: *verbose}
+	if cmd != subcmdCompletion && *port == 0 {
+		fmt.Fprintln(output, "error: -p <port> is required")
+		fs.Usage()
+		return parsedArgs{}, fmt.Errorf("-p <port> is required")
+	}
 
 	switch cmd {
 	case subcmdAnim:
@@ -95,6 +102,14 @@ func parse(argv []string, output io.Writer) (parsedArgs, error) {
 			name = animationCmd.Args()[0]
 		}
 		result.animation = animationArgs{animation: name}
+	case subcmdCompletion:
+		if err := completionCmd.Parse(subArgs); err != nil {
+			return parsedArgs{}, err
+		}
+		if len(completionCmd.Args()) != 1 || completionCmd.Args()[0] != "zsh" {
+			return parsedArgs{}, fmt.Errorf("usage: %s %s zsh", appName, subcmdCompletion)
+		}
+		result.completion = completionArgs{shell: completionCmd.Args()[0]}
 	case subcmdPet:
 		if err := petCmd.Parse(subArgs); err != nil {
 			return parsedArgs{}, err

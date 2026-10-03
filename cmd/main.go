@@ -23,6 +23,10 @@ func main() {
 	if err != nil {
 		os.Exit(2)
 	}
+	if a.command == subcmdCompletion {
+		fmt.Print(zshCompletion)
+		return
+	}
 
 	logLevel := slog.LevelInfo
 	if a.verbose {
