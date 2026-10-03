@@ -148,6 +148,44 @@ func TestViewDispatch(t *testing.T) {
 		}
 	})
 
+	t.Run("passes the configured frame count to showAnimation", func(t *testing.T) {
+		t.Parallel()
+		mock := NewMockInternalView()
+		v := newTestView(mock)
+		readyCh := make(chan struct{})
+		close(readyCh)
+		spritePath := writeSpritePNG(t, 128, 32)
+		anim := pet.NewKeeper(config.Config{
+			Pets: []config.PetConfig{{
+				Name:  "test",
+				Frame: config.DimensionConfig{Width: 32, Height: 32},
+				Animations: []config.AnimationConfig{{
+					Name: "idle", File: spritePath, FPS: 10, Count: 2,
+				}},
+			}},
+		}).Animations("test")[0]
+
+		ctx, cancel := context.WithCancel(t.Context())
+		done := make(chan struct{})
+		go func() {
+			v.dispatch(ctx, readyCh)
+			close(done)
+		}()
+		v.animCh <- anim
+		<-mock.DispatchDone
+		cancel()
+		<-done
+
+		absPath, err := filepath.Abs(spritePath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := fmt.Sprintf("showAnimation(%q, 10, 32, 32, 32, 32, 2)", "file://"+absPath)
+		if len(mock.EvalCalls) != 1 || mock.EvalCalls[0] != want {
+			t.Errorf("Eval calls = %q, want [%q]", mock.EvalCalls, want)
+		}
+	})
+
 }
 
 // animForTest returns an Animation with explicit fps so CalcFps succeeds
@@ -156,10 +194,10 @@ func TestViewDispatch(t *testing.T) {
 func animForTest(fps int, frame pet.Dimension) pet.Animation {
 	anims := pet.NewKeeper(config.Config{
 		Pets: []config.PetConfig{{
-			Name:   "test",
-			FPS:    fps,
-			Frame:  config.DimensionConfig{Width: frame.Width, Height: frame.Height},
-			Window: config.DimensionConfig{Width: frame.Width, Height: frame.Height},
+			Name:       "test",
+			FPS:        fps,
+			Frame:      config.DimensionConfig{Width: frame.Width, Height: frame.Height},
+			Window:     config.DimensionConfig{Width: frame.Width, Height: frame.Height},
 			Animations: []config.AnimationConfig{{Name: "idle", File: "idle.png"}},
 		}},
 	}).Animations("test")
