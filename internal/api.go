@@ -6,7 +6,13 @@ const (
 	ToolListPets   = "list_pets"
 	ToolChangePet  = "change_pet"
 	ToolPlayPrefix = "play_"
+	ToolVet        = "vet"
 )
+
+type VetResponse struct {
+	Valid       bool   `json:"valid"`
+	Description string `json:"description,omitempty"`
+}
 
 type ChangePetInput struct {
 	Name      string `json:"name"`

@@ -1,11 +1,36 @@
 package internal
 
 import (
+	"flag"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestParseArgsUsesConfigPathFromEnvironment(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "custom.toml")
+	t.Setenv("AGENT_PET_CONFIG", configPath)
+
+	previousArgs := os.Args
+	previousFlags := flag.CommandLine
+	t.Cleanup(func() {
+		os.Args = previousArgs
+		flag.CommandLine = previousFlags
+	})
+	os.Args = []string{"agentpet"}
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	flag.CommandLine.SetOutput(io.Discard)
+
+	got, err := ParseArgs()
+	if err != nil {
+		t.Fatalf("ParseArgs() error = %v", err)
+	}
+	if got.ConfigFile != configPath {
+		t.Errorf("ConfigFile = %q, want %q", got.ConfigFile, configPath)
+	}
+}
 
 func TestDefaultConfigPath(t *testing.T) {
 	t.Parallel()

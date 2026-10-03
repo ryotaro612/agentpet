@@ -90,7 +90,7 @@ func TestServerConfigChange(t *testing.T) {
 		v := newTestView(t)
 
 		initialPort := freePort(t)
-		s, err := NewServer(cfgCh, v, initialPort, catConfig(), logger, cancel)
+		s, err := NewServer(cfgCh, v, initialPort, catConfig(), "", logger, cancel)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -122,7 +122,7 @@ func TestServerConfigChange(t *testing.T) {
 		cfgCh := make(chan config.Config, 1)
 		v := newTestView(t)
 
-		s, err := NewServer(cfgCh, v, 0, catConfig(), logger, cancel)
+		s, err := NewServer(cfgCh, v, 0, catConfig(), "", logger, cancel)
 		if err != nil {
 			t.Fatal(err)
 		}

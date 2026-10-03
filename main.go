@@ -38,7 +38,7 @@ func main() {
 		logger.Error("failed to create view", "err", err)
 		os.Exit(1)
 	}
-	s, err := server.NewServer(cfgCh, v, cfg.Port, cfg, logger, cancel)
+	s, err := server.NewServer(cfgCh, v, cfg.Port, cfg, args.ConfigFile, logger, cancel)
 	if err != nil {
 		logger.Error("failed to create server", "err", err)
 		os.Exit(1)

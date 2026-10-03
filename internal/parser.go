@@ -33,6 +33,9 @@ func ParseArgs() (args, error) {
 	if err != nil {
 		return args{}, err
 	}
+	if envCfg := os.Getenv("AGENT_PET_CONFIG"); envCfg != "" {
+		defaultConfig = envCfg
+	}
 	var configFile string
 	var verbose bool
 	flag.StringVar(&configFile, "c", defaultConfig, "path to config file (TOML)")

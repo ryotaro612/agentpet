@@ -62,6 +62,11 @@ func TestParse(t *testing.T) {
 			argv:   []string{"-h"},
 			isHelp: true,
 		},
+		{
+			name: "parses the vet subcommand",
+			argv: []string{"-p", "8080", "vet"},
+			want: parsedArgs{port: 8080, command: "vet"},
+		},
 	}
 
 	for _, c := range cases {

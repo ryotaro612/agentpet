@@ -13,6 +13,7 @@ const (
 	subcmdPets = "pets"
 	subcmdShow = "show"
 	subcmdHide = "hide"
+	subcmdVet  = "vet"
 )
 
 type animationArgs struct {
@@ -34,25 +35,22 @@ type parsedArgs struct {
 }
 
 func parse(argv []string, output io.Writer) (parsedArgs, error) {
-	fs := flag.NewFlagSet(appName, flag.ContinueOnError)
-	fs.SetOutput(output)
+	newFlagSet := func(name string) *flag.FlagSet {
+		fs := flag.NewFlagSet(name, flag.ContinueOnError)
+		fs.SetOutput(output)
+		return fs
+	}
+
+	fs := newFlagSet(appName)
 	port := fs.Int("p", 0, "MCP server `port`")
 	verbose := fs.Bool("v", false, "verbose output")
 
-	animationCmd := flag.NewFlagSet(subcmdAnim, flag.ContinueOnError)
-	animationCmd.SetOutput(output)
-
-	petCmd := flag.NewFlagSet(subcmdPet, flag.ContinueOnError)
-	petCmd.SetOutput(output)
-
-	petsCmd := flag.NewFlagSet(subcmdPets, flag.ContinueOnError)
-	petsCmd.SetOutput(output)
-
-	showCmd := flag.NewFlagSet(subcmdShow, flag.ContinueOnError)
-	showCmd.SetOutput(output)
-
-	hideCmd := flag.NewFlagSet(subcmdHide, flag.ContinueOnError)
-	hideCmd.SetOutput(output)
+	animationCmd := newFlagSet(subcmdAnim)
+	petCmd := newFlagSet(subcmdPet)
+	petsCmd := newFlagSet(subcmdPets)
+	showCmd := newFlagSet(subcmdShow)
+	hideCmd := newFlagSet(subcmdHide)
+	vetCmd := newFlagSet(subcmdVet)
 
 	fs.Usage = func() {
 		fmt.Fprintf(output, "Usage: %s -p <port> [-v] <subcommand> [args]\n\n", appName)
@@ -64,6 +62,7 @@ func parse(argv []string, output io.Writer) (parsedArgs, error) {
 		fmt.Fprintf(output, "  %s\n", subcmdPets)
 		fmt.Fprintf(output, "  %s\n", subcmdShow)
 		fmt.Fprintf(output, "  %s\n", subcmdHide)
+		fmt.Fprintf(output, "  %s\n", subcmdVet)
 	}
 
 	if err := fs.Parse(argv); err != nil {
@@ -117,6 +116,10 @@ func parse(argv []string, output io.Writer) (parsedArgs, error) {
 		}
 	case subcmdHide:
 		if err := hideCmd.Parse(subArgs); err != nil {
+			return parsedArgs{}, err
+		}
+	case subcmdVet:
+		if err := vetCmd.Parse(subArgs); err != nil {
 			return parsedArgs{}, err
 		}
 	default:

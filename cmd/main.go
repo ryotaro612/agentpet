@@ -57,6 +57,8 @@ func main() {
 		runErr = cmdWindow(ctx, session, internal.ToolShowWindow, logger)
 	case subcmdHide:
 		runErr = cmdWindow(ctx, session, internal.ToolHideWindow, logger)
+	case subcmdVet:
+		runErr = cmdVet(ctx, session, logger)
 	}
 	if runErr != nil {
 		fmt.Fprintln(os.Stderr, "error:", runErr)
@@ -203,6 +205,30 @@ func cmdWindow(ctx context.Context, session *mcp.ClientSession, toolName string,
 		return fmt.Errorf("calling %s: %w", toolName, err)
 	}
 	printResult(result)
+	return nil
+}
+
+func cmdVet(ctx context.Context, session *mcp.ClientSession, logger *slog.Logger) error {
+	logger.Debug("calling tool", "name", internal.ToolVet)
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: internal.ToolVet})
+	if err != nil {
+		return fmt.Errorf("calling %s: %w", internal.ToolVet, err)
+	}
+	if len(result.Content) == 0 {
+		return fmt.Errorf("empty response from %s", internal.ToolVet)
+	}
+	text, ok := result.Content[0].(*mcp.TextContent)
+	if !ok {
+		return fmt.Errorf("unexpected content type from %s", internal.ToolVet)
+	}
+	var resp internal.VetResponse
+	if err := json.Unmarshal([]byte(text.Text), &resp); err != nil {
+		return fmt.Errorf("parsing vet response: %w", err)
+	}
+	if !resp.Valid {
+		return fmt.Errorf("%s", resp.Description)
+	}
+	fmt.Println("config is valid")
 	return nil
 }
 

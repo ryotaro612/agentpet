@@ -21,6 +21,7 @@ type server struct {
 	cfgCh     <-chan config.Config
 	v         *view.View
 	port      int // configured port (0 = auto); updated to the bound port after Listen
+	cfgPath   string
 	mcpServer *mcp.Server
 	logger    *slog.Logger
 	cancel    context.CancelFunc
@@ -28,16 +29,17 @@ type server struct {
 	k         pet.Keeper
 }
 
-func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Config, logger *slog.Logger, cancel context.CancelFunc) (*server, error) {
+func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Config, cfgPath string, logger *slog.Logger, cancel context.CancelFunc) (*server, error) {
 	if v == nil {
 		return nil, fmt.Errorf("server: view is required")
 	}
 	k := pet.NewKeeper(cfg)
 
 	s := server{
-		cfgCh: cfgCh,
-		v:     v,
-		port:  port,
+		cfgCh:   cfgCh,
+		v:       v,
+		port:    port,
+		cfgPath: cfgPath,
 		mcpServer: mcp.NewServer(&mcp.Implementation{Name: "agentpet", Version: "v0.0.1"}, &mcp.ServerOptions{
 			Capabilities: &mcp.ServerCapabilities{
 				Tools: &mcp.ToolCapabilities{ListChanged: true},
@@ -52,6 +54,8 @@ func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Co
 	mcp.AddTool(s.mcpServer, &show.tool, show.handler)
 	hide := hideWindowTool(s.v)
 	mcp.AddTool(s.mcpServer, &hide.tool, hide.handler)
+	vet := vetTool(s.cfgPath)
+	mcp.AddTool(s.mcpServer, &vet.tool, vet.handler)
 	petName := k.DefaultPet()
 	s.registerTools(petName, nil)
 	if anim, ok := k.DefaultAnim(petName); ok {
