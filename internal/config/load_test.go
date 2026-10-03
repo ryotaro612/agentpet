@@ -39,7 +39,7 @@ func TestLoadConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "parses a pet animation with file path, name, and description",
+			name: "parses a pet animation",
 			file: "testdata/pet_animation.toml",
 			want: Config{
 				Pets: []PetConfig{
@@ -52,6 +52,7 @@ func TestLoadConfig(t *testing.T) {
 								Description: "The cat sits still",
 								File:        "idle.png",
 								FPS:         6,
+								Count:       6,
 							},
 						},
 					},

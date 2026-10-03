@@ -10,3 +10,4 @@ name        = "idle"
 description = "The cat sits still"
 filepath    = "idle.png"
 fps         = 6
+count       = 6

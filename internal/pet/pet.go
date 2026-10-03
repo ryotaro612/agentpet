@@ -123,7 +123,7 @@ func resolveAnimation(a config.AnimationConfig, p config.PetConfig, cfg config.C
 	return Animation{
 		filePath: a.File,
 		fps:      coalesce(a.FPS, p.FPS, cfg.FPS),
-		count:    coalesce(a.Frame.Count, cfg.Frame.Count),
+		count:    a.Count,
 		frame: Dimension{
 			Height: coalesce(a.Frame.Height, p.Frame.Height, cfg.Frame.Height),
 			Width:  coalesce(a.Frame.Width, p.Frame.Width, cfg.Frame.Width),

@@ -9,12 +9,12 @@ func (d DimensionConfig) isComplete() bool {
 }
 
 type Config struct {
-	Port   int                  `toml:"port"`
-	Pet    string               `toml:"pet"`
-	Window DimensionConfig      `toml:"window"`
-	Frame  FrameDimentionConfig `toml:"frame"`
-	FPS    int                  `toml:"fps"`
-	Pets   []PetConfig          `toml:"pets"`
+	Port   int             `toml:"port"`
+	Pet    string          `toml:"pet"`
+	Window DimensionConfig `toml:"window"`
+	Frame  DimensionConfig `toml:"frame"`
+	FPS    int             `toml:"fps"`
+	Pets   []PetConfig     `toml:"pets"`
 }
 
 type PetConfig struct {
@@ -27,20 +27,16 @@ type PetConfig struct {
 }
 
 type AnimationConfig struct {
-	Name        string               `toml:"name"`
-	Description string               `toml:"description"`
-	File        string               `toml:"filepath"`
-	Frame       FrameDimentionConfig `toml:"frame"`
-	Window      DimensionConfig      `toml:"window"`
-	FPS         int                  `toml:"fps"`
+	Name        string          `toml:"name"`
+	Description string          `toml:"description"`
+	File        string          `toml:"filepath"`
+	Frame       DimensionConfig `toml:"frame"`
+	Window      DimensionConfig `toml:"window"`
+	FPS         int             `toml:"fps"`
+	Count       int             `toml:"count"`
 }
 
 type DimensionConfig struct {
 	Height int `toml:"height"`
 	Width  int `toml:"width"`
-}
-
-type FrameDimentionConfig struct {
-	DimensionConfig
-	Count int `toml:"count"`
 }
