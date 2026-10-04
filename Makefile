@@ -6,6 +6,7 @@ ICON_SRC   := asserts/icon.png
 PLIST_SRC  := asserts/Info.plist
 ICONSET    := dist/AppIcon.iconset
 ASSETS     := $(ICON_SRC) $(PLIST_SRC)
+BINDIR     ?= $(HOME)/.local/bin
 
 GO_SRCS  := main.go $(shell find internal -name '*.go')
 CMD_SRCS := $(wildcard cmd/*.go)
@@ -46,6 +47,14 @@ app: $(BINARY) $(ASSETS) ## Package agentpet as a macOS .app bundle.
 dist:
 	@mkdir -p dist
 
+##@ Installation
+install: petowner ## Install petowner to BINDIR (default: $$HOME/.local/bin).
+	mkdir -p "$(BINDIR)"
+	install -m 755 "$(CLIENT)" "$(BINDIR)/petowner"
+
+uninstall: ## Remove petowner from BINDIR.
+	rm -f "$(BINDIR)/petowner"
+
 ##@ Test
 test: ## Run tests.
 	go test ./...
@@ -60,4 +69,4 @@ help: ## Display this help.
 
 .DEFAULT_GOAL := help
 
-.PHONY: all build petowner app test clean help dist
+.PHONY: all build petowner app install uninstall test clean help dist
