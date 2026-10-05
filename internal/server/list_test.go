@@ -61,6 +61,7 @@ func TestToolList(t *testing.T) {
 		internal.ToolPlayPrefix + "idle",
 		internal.ToolPlayPrefix + "walk",
 		internal.ToolShowWindow,
+		internal.ToolShuffle,
 		internal.ToolVet,
 	}
 

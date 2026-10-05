@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"math/rand/v2"
 	"os"
-	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/ryotaro612/agentpet/internal"
@@ -71,37 +70,9 @@ func main() {
 }
 
 func cmdAnimation(ctx context.Context, session *mcp.ClientSession, name string, logger *slog.Logger) error {
-	var toolName string
+	toolName := internal.ToolShuffle
 	if name != "" {
 		toolName = internal.ToolPlayPrefix + name
-	} else {
-		tools, err := session.ListTools(ctx, &mcp.ListToolsParams{})
-		if err != nil {
-			return fmt.Errorf("listing tools: %w", err)
-		}
-		var animTools []string
-		for _, t := range tools.Tools {
-			if strings.HasPrefix(t.Name, internal.ToolPlayPrefix) {
-				animTools = append(animTools, t.Name)
-			}
-		}
-		if len(animTools) == 0 {
-			return fmt.Errorf("no animation tools found")
-		}
-		candidates := animTools
-		if current := currentAnimToolName(ctx, session); current != "" {
-			others := make([]string, 0, len(animTools)-1)
-			for _, t := range animTools {
-				if t != current {
-					others = append(others, t)
-				}
-			}
-			if len(others) == 0 {
-				return fmt.Errorf("no other animations to switch to")
-			}
-			candidates = others
-		}
-		toolName = candidates[rand.IntN(len(candidates))]
 	}
 	logger.Debug("calling tool", "name", toolName)
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: toolName})
@@ -110,16 +81,6 @@ func cmdAnimation(ctx context.Context, session *mcp.ClientSession, name string, 
 	}
 	printResult(result)
 	return nil
-}
-
-// currentAnimToolName returns the "play_<name>" tool name of the currently
-// active animation. Returns "" on any error so the caller can fall back gracefully.
-func currentAnimToolName(ctx context.Context, session *mcp.ClientSession) string {
-	resp, err := listPets(ctx, session)
-	if err != nil || resp.Active.Animation == "" {
-		return ""
-	}
-	return internal.ToolPlayPrefix + resp.Active.Animation
 }
 
 func cmdPet(ctx context.Context, session *mcp.ClientSession, pet, animation string, logger *slog.Logger) error {

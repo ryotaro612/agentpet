@@ -35,9 +35,14 @@ _petowner()
             ;;
         animation)
             if [[ -n $port ]]; then
-                values=("${(@f)$("${words[1]}" -p "$port" pets 2>/dev/null |
-                    awk '/^  / {print $1}' | sort -u)}")
-                compadd -- $values
+                local pets_out active_pet
+                pets_out=$("${words[1]}" -p "$port" pets 2>/dev/null)
+                active_pet=$(echo "$pets_out" | awk '/\(active\)/ { print $1; exit }')
+                if [[ -n $active_pet ]]; then
+                    values=("${(@f)$(echo "$pets_out" |
+                        awk -v pet="$active_pet" '/^[^ ]/ {active=($1==pet); next} active && /^  / {print $1}')}")
+                    compadd -- $values
+                fi
             fi
             ;;
         pet)

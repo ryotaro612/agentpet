@@ -6,7 +6,8 @@ const (
 	ToolListPets   = "list_pets"
 	ToolChangePet  = "change_pet"
 	ToolPlayPrefix = "play_"
-	ToolVet        = "vet"
+	ToolVet     = "vet"
+	ToolShuffle = "shuffle_animation"
 )
 
 type VetResponse struct {

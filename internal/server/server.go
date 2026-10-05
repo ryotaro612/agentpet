@@ -50,12 +50,14 @@ func NewServer(cfgCh <-chan config.Config, v *view.View, port int, cfg config.Co
 		k:      k,
 	}
 
-	show := showWindowTool(s.v)
-	mcp.AddTool(s.mcpServer, &show.tool, show.handler)
-	hide := hideWindowTool(s.v)
-	mcp.AddTool(s.mcpServer, &hide.tool, hide.handler)
-	vet := vetTool(s.cfgPath)
-	mcp.AddTool(s.mcpServer, &vet.tool, vet.handler)
+	for _, t := range []mcpTool{
+		showWindowTool(s.v),
+		hideWindowTool(s.v),
+		vetTool(s.cfgPath),
+		shuffleAnimationTool(&s),
+	} {
+		mcp.AddTool(s.mcpServer, &t.tool, t.handler)
+	}
 	petName := k.DefaultPet()
 	s.registerTools(petName, nil)
 	if anim, ok := k.DefaultAnim(petName); ok {
