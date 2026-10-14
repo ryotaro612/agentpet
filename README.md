@@ -130,12 +130,6 @@ Generate and load the completion script:
 source <(petowner completion zsh)
 ```
 
-Add that line to `~/.zshrc` to load it on every new shell. If `petowner` is not on `PATH`, use its full path:
-
-```zsh
-source <(/path/to/petowner completion zsh)
-```
-
 Tab completion fills in subcommand names, pet names, and animation names. Pet and animation names are fetched live from the running server when `-p` is specified.
 
 ```zsh
