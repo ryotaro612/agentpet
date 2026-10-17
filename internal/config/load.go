@@ -40,18 +40,19 @@ func (c Config) validate() error {
 		}
 		animSeen := make(map[string]bool, len(pet.Animations))
 		for _, anim := range pet.Animations {
-			if animSeen[anim.Name] {
-				errs = append(errs, fmt.Errorf("pet %q has duplicate animation name %q", pet.Name, anim.Name))
+			name := anim.ResolvedName()
+			if animSeen[name] {
+				errs = append(errs, fmt.Errorf("pet %q has duplicate animation name %q", pet.Name, name))
 			}
-			animSeen[anim.Name] = true
+			animSeen[name] = true
 			if anim.Frame.isPartial() {
-				errs = append(errs, fmt.Errorf("animation %q frame: both height and width are required", anim.Name))
+				errs = append(errs, fmt.Errorf("animation %q frame: both height and width are required", name))
 			}
 			if !anim.Frame.isComplete() && !pet.Frame.isComplete() && !c.Frame.isComplete() {
-				errs = append(errs, fmt.Errorf("animation %q in pet %q: frame is required", anim.Name, pet.Name))
+				errs = append(errs, fmt.Errorf("animation %q in pet %q: frame is required", name, pet.Name))
 			}
 			if anim.File == "" {
-				errs = append(errs, fmt.Errorf("animation %q in pet %q: filepath is required", anim.Name, pet.Name))
+				errs = append(errs, fmt.Errorf("animation %q in pet %q: filepath is required", name, pet.Name))
 			}
 		}
 	}

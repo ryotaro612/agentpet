@@ -128,7 +128,7 @@ func resolveAnimation(a config.AnimationConfig, p config.PetConfig, cfg config.C
 			Height: coalesce(a.Frame.Height, p.Frame.Height, cfg.Frame.Height),
 			Width:  coalesce(a.Frame.Width, p.Frame.Width, cfg.Frame.Width),
 		},
-		Name:        a.Name,
+		Name:        a.ResolvedName(),
 		Description: a.Description,
 		window: Dimension{
 			Height: coalesce(a.Window.Height, p.Window.Height, cfg.Window.Height),

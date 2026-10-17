@@ -1,5 +1,10 @@
 package config
 
+import (
+	"path/filepath"
+	"strings"
+)
+
 func (d DimensionConfig) isPartial() bool {
 	return (d.Height == 0) != (d.Width == 0)
 }
@@ -34,6 +39,16 @@ type AnimationConfig struct {
 	Window      DimensionConfig `toml:"window"`
 	FPS         int             `toml:"fps"`
 	Count       int             `toml:"count"`
+}
+
+// ResolvedName returns the animation name. If Name is empty, it is derived
+// from the filename without its extension.
+func (a AnimationConfig) ResolvedName() string {
+	if a.Name != "" {
+		return a.Name
+	}
+	base := filepath.Base(a.File)
+	return strings.TrimSuffix(base, filepath.Ext(base))
 }
 
 type DimensionConfig struct {

@@ -6,6 +6,34 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func TestAnimationConfigResolvedName(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns the explicit Name field when set", func(t *testing.T) {
+		t.Parallel()
+		a := AnimationConfig{Name: "idle", File: "walk.png"}
+		if got := a.ResolvedName(); got != "idle" {
+			t.Errorf("ResolvedName() = %q, want %q", got, "idle")
+		}
+	})
+
+	t.Run("derives name from filepath when Name is empty", func(t *testing.T) {
+		t.Parallel()
+		a := AnimationConfig{File: "walk.png"}
+		if got := a.ResolvedName(); got != "walk" {
+			t.Errorf("ResolvedName() = %q, want %q", got, "walk")
+		}
+	})
+
+	t.Run("strips directory and extension when deriving from filepath", func(t *testing.T) {
+		t.Parallel()
+		a := AnimationConfig{File: "/path/to/idle.png"}
+		if got := a.ResolvedName(); got != "idle" {
+			t.Errorf("ResolvedName() = %q, want %q", got, "idle")
+		}
+	})
+}
+
 func TestLoadConfig(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
@@ -143,6 +171,11 @@ func TestLoadConfig(t *testing.T) {
 		{
 			name:    "returns an error on duplicate animation names within a pet",
 			file:    "testdata/duplicate_animation_names.toml",
+			wantErr: true,
+		},
+		{
+			name:    "returns an error when derived animation names are duplicated",
+			file:    "testdata/duplicate_animation_names_derived.toml",
 			wantErr: true,
 		},
 	}

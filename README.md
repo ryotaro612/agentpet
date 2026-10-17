@@ -73,7 +73,7 @@ count = 4   # omit to compute from image size ÷ frame size
 | `fps` | global / pet / animation | Playback speed in frames per second |
 | `pets[].name` | pet | Unique pet name (required) |
 | `pets[].description` | pet | Description exposed to MCP clients |
-| `pets[].animations[].name` | animation | Unique animation name within a pet (required) |
+| `pets[].animations[].name` | animation | Unique animation name within a pet; derived from the filename without extension when omitted |
 | `pets[].animations[].filepath` | animation | Path to the spritesheet image (required) |
 | `pets[].animations[].count` | animation | Explicit frame count; omit to derive from image size |
 
