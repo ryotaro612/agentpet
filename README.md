@@ -178,9 +178,6 @@ make petowner
 
 # Install petowner to ~/.local/bin
 make install
-
-# Run tests
-make test
 ```
 
 The `BINDIR` variable overrides the install destination:
@@ -188,3 +185,11 @@ The `BINDIR` variable overrides the install destination:
 ```sh
 make install BINDIR=/usr/local/bin
 ```
+
+## Testing
+
+```sh
+make test
+```
+
+Tests do not require a running server or a config file. The `view` package tests open a native WebView window and must run on macOS.

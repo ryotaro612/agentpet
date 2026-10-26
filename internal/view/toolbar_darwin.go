@@ -10,7 +10,7 @@ package view
 //
 // void setupWindow(void* ptr) {
 //     NSWindow* w = (__bridge NSWindow*)ptr;
-//     w.styleMask = NSWindowStyleMaskBorderless | NSWindowStyleMaskResizable;
+//     w.styleMask = NSWindowStyleMaskBorderless;
 //     w.opaque = NO;
 //     w.backgroundColor = [NSColor clearColor];
 //     w.level = NSFloatingWindowLevel;
@@ -68,7 +68,7 @@ package view
 // // and leaves the content area smaller than intended after setupWindow removes it.
 // void setWindowSize(void* ptr, int width, int height) {
 //     NSWindow* w = (__bridge NSWindow*)ptr;
-//     w.styleMask = NSWindowStyleMaskBorderless | NSWindowStyleMaskResizable;
+//     w.styleMask = NSWindowStyleMaskBorderless;
 //     w.opaque = NO;
 //     w.backgroundColor = [NSColor clearColor];
 //     w.level = NSFloatingWindowLevel;
@@ -95,7 +95,7 @@ package view
 // // expands or contracts around its current center point.
 // void resizeWindowKeepingPosition(void* ptr, int width, int height) {
 //     NSWindow* w = (__bridge NSWindow*)ptr;
-//     w.styleMask = NSWindowStyleMaskBorderless | NSWindowStyleMaskResizable;
+//     w.styleMask = NSWindowStyleMaskBorderless;
 //     w.opaque = NO;
 //     w.backgroundColor = [NSColor clearColor];
 //     w.level = NSFloatingWindowLevel;
