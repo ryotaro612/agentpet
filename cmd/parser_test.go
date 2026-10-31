@@ -64,8 +64,8 @@ func TestParse(t *testing.T) {
 		},
 		{
 			name: "parses the vet subcommand",
-			argv: []string{"-p", "8080", "vet"},
-			want: parsedArgs{port: 8080, command: "vet"},
+			argv: []string{"vet", "/path/to/config.toml"},
+			want: parsedArgs{command: "vet", vet: vetArgs{configFile: "/path/to/config.toml"}},
 		},
 		{
 			name: "parses zsh completion without a port",

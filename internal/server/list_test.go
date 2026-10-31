@@ -30,7 +30,7 @@ func TestToolList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s, err := NewServer(cfgCh, view.Noop(), 0, cfg, "testdata/TestToolList.toml", logger, cancel)
+	s, err := NewServer(cfgCh, view.Noop(), 0, cfg, logger, cancel)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,6 @@ func TestToolList(t *testing.T) {
 		internal.ToolPlayPrefix + "walk",
 		internal.ToolShowWindow,
 		internal.ToolShuffle,
-		internal.ToolVet,
 	}
 
 	if diff := cmp.Diff(want, got); diff != "" {

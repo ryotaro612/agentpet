@@ -31,6 +31,10 @@ type petArgs struct {
 	animationArgs
 }
 
+type vetArgs struct {
+	configFile string
+}
+
 type parsedArgs struct {
 	port       int
 	command    string
@@ -38,6 +42,7 @@ type parsedArgs struct {
 	animation  animationArgs
 	completion completionArgs
 	pet        petArgs
+	vet        vetArgs
 }
 
 func parse(argv []string, output io.Writer) (parsedArgs, error) {
@@ -70,7 +75,7 @@ func parse(argv []string, output io.Writer) (parsedArgs, error) {
 		fmt.Fprintf(output, "  %s\n", subcmdPets)
 		fmt.Fprintf(output, "  %s\n", subcmdShow)
 		fmt.Fprintf(output, "  %s\n", subcmdHide)
-		fmt.Fprintf(output, "  %s\n", subcmdVet)
+		fmt.Fprintf(output, "  %s <config-file>\n", subcmdVet)
 	}
 
 	if err := fs.Parse(argv); err != nil {
@@ -86,7 +91,7 @@ func parse(argv []string, output io.Writer) (parsedArgs, error) {
 	cmd := rest[0]
 	subArgs := rest[1:]
 	result := parsedArgs{port: *port, command: cmd, verbose: *verbose}
-	if cmd != subcmdCompletion && *port == 0 {
+	if cmd != subcmdCompletion && cmd != subcmdVet && *port == 0 {
 		fmt.Fprintln(output, "error: -p <port> is required")
 		fs.Usage()
 		return parsedArgs{}, fmt.Errorf("-p <port> is required")
@@ -137,6 +142,10 @@ func parse(argv []string, output io.Writer) (parsedArgs, error) {
 		if err := vetCmd.Parse(subArgs); err != nil {
 			return parsedArgs{}, err
 		}
+		if len(vetCmd.Args()) != 1 {
+			return parsedArgs{}, fmt.Errorf("usage: %s %s <config-file>", appName, subcmdVet)
+		}
+		result.vet = vetArgs{configFile: vetCmd.Args()[0]}
 	default:
 		fmt.Fprintf(output, "error: unknown subcommand %q\n", cmd)
 		return parsedArgs{}, fmt.Errorf("unknown subcommand %q", cmd)
