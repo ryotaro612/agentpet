@@ -99,7 +99,8 @@ Subcommands:
                           active pet and animation.
   show                    Show the pet window.
   hide                    Hide the pet window.
-  vet                     Validate the configuration file and report errors.
+  vet <config-file>       Validate the configuration file and report errors.
+                          Does not require a running server.
   completion zsh          Print the zsh completion script.
 ```
 
@@ -119,7 +120,7 @@ petowner -p 60012 pet cat
 petowner -p 60012 pet cat walk
 
 # Check whether the config file is valid
-petowner -p 60012 vet
+petowner vet ~/.local/agentpet/config.toml
 ```
 
 ## Zsh completion
