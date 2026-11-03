@@ -33,6 +33,9 @@ _petowner()
         completion)
             compadd -- zsh
             ;;
+        vet)
+            _files
+            ;;
         animation)
             if [[ -n $port ]]; then
                 local pets_out active_pet
